@@ -71,7 +71,12 @@ cd serial_and_tbb
 # get dataset
 http://jacarini.dinf.usherbrooke.ca/static/dataset/dataset2014.zip
 
-# change dir path on line 12 serial_main.cpp to your data
+# change dir path on line 12 main.cpp to your data
+```
+// Specify path to image set 
+// (ex: badminton, boulevard, sofa, traffic)
+const char* PATH = "../Videos/sofa/input/";
+```
 
 # then do make inside the in directory
 ```
