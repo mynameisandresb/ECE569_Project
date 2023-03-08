@@ -64,7 +64,7 @@ source $HOME/.bashrc
 
 # change to cloned code and relevant part
 ```
-cd NAMEOFCLONEDCODE
+cd ECE569_Project
 cd serial_and_tbb
 ```
 
