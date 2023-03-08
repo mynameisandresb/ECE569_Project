@@ -16,7 +16,8 @@ If you use their implementation please cite:
 The CUDA implementation of their code is in the cuda folder. Both the serial and parallelized tbb versions of their code reside in the same folder: serial_and_tbb. They can both be seen in the main.cpp and DualSGM.cpp files.
 
 
-Install instructions
+# Install instructions
+
 
 # Download and unpack sources
 ```
