@@ -19,41 +19,54 @@ The CUDA implementation of our code is in the cuda folder. Both the serial and p
 Install instructions
 
 # Download and unpack sources
+```
 wget -O opencv.zip https://github.com/opencv/opencv/archive/refs/tags/3.3.0.zip
 
 unzip opencv.zip
+```
 
 # Create build directory
+```
 mkdir -p build && cd build
+```
 
 # Configure
+```
 cmake  ../opencv-3.3.0
+```
 
 # Build
+```
 cmake --build .
 
 cmake -DCMAKE_INSTALL_PREFIX=$HOME/.local .
 
 make install -j64
+```
 
 #.bashrc file edits, add exports to bashrc
+```
 vim $HOME/.bashrc
-
+```
+```
 export PATH=$HOME/.local/include:${PATH}
 export LD_LIBRARY_PATH=$HOME/.local/lib
 export LIBRARY_PATH=$HOME/.local/lib
 export CPLUS_INCLUDE_PATH=$HOME/.local/include
 export PKG_CONFIG_PATH=$HOME/.local/lib/pkgconfig
-
+```
 # source bashrc
+```
 source $HOME/.bashrc
-
+```
 # download source code
 [https://github.com/zpiernater/ECE569_Project](https://github.com/zpiernater/ECE569_Project.git)
 
 # change to cloned code and relevant part
+```
 cd NAMEOFCLONEDCODE
 cd serial_and_tbb
+```
 
 # get dataset
 http://jacarini.dinf.usherbrooke.ca/static/dataset/dataset2014.zip
@@ -61,7 +74,11 @@ http://jacarini.dinf.usherbrooke.ca/static/dataset/dataset2014.zip
 # change dir path on line 12 serial_main.cpp to your data
 
 # then do make inside the in directory
+```
 make
+```
 
 # run code
+```
 ./main 1 0 0
+```
