@@ -1,3 +1,5 @@
+Source code from https://github.com/Breakend/MotionDetection
+
 A parallelized motion detection implementation of <a href="http://ieeexplore.ieee.org/document/6595847/">Yi et al.’s dual-mode SGM background subtraction model</a>. 
 
 If you use our implementation please cite:
