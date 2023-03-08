@@ -44,7 +44,7 @@ cmake -DCMAKE_INSTALL_PREFIX=$HOME/.local .
 make install -j64
 ```
 
-#.bashrc file edits, add exports to bashrc
+# Add exports to bashrc
 ```
 vim $HOME/.bashrc
 ```
@@ -55,14 +55,16 @@ export LIBRARY_PATH=$HOME/.local/lib
 export CPLUS_INCLUDE_PATH=$HOME/.local/include
 export PKG_CONFIG_PATH=$HOME/.local/lib/pkgconfig
 ```
-# source bashrc
+
+# Source bashrc
 ```
 source $HOME/.bashrc
 ```
-# download source code
+
+# Download source code
 [https://github.com/zpiernater/ECE569_Project](https://github.com/zpiernater/ECE569_Project.git)
 
-# change to cloned code and relevant part
+# Change directory to relevant cloned code
 ```
 cd ECE569_Project
 cd serial_and_tbb
@@ -73,12 +75,14 @@ http://jacarini.dinf.usherbrooke.ca/static/dataset/dataset2014.zip
 
 # change dir path on line 12 main.cpp to your data
 ```
+...CODE SNIPPET FROM serial_and_tbb/main.cpp...
+
 // Specify path to image set 
 // (ex: badminton, boulevard, sofa, traffic)
 const char* PATH = "../Videos/sofa/input/";
 ```
 
-# then do make inside the in directory
+# Make inside serial_and_tbb
 ```
 make
 ```
