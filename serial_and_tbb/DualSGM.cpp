@@ -109,7 +109,7 @@ void DualSGM::motionCompensation(Mat* next_frame)
         cv::calcOpticalFlowPyrLK(m_prevImg, m_nextImg, m_prevPts, m_nextPts, m_status, m_error, Size(20,20), 5);
 
         cv::Mat mask;
-        vector <Point2f> prev_corner2, cur_corner2;
+        std::vector <cv::Point2f> prev_corner2, cur_corner2;
         n = next_frame->clone();
 
         // weed out bad matches
