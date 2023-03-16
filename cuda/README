@@ -2,7 +2,8 @@ To build and run. Make sure you have CUDA and OPEN_CV and CMAKE installed. You c
 
 mkdir build
 cd build
-cmake ..
+module load cuda11/11.0
+CC=gcc cmake3 ..
 make clean
 make
 ../bin/BGS
