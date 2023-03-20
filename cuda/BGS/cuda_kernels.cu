@@ -4,7 +4,7 @@
 /*
 * Flag whether to use separable gaussian filter or 2D
 */
-#define SEPARATED_GAUSSIAN_FILTER 0
+#define SEPARATED_GAUSSIAN_FILTER 1
 
 /**
 * CUDA Kernel for DSGM
