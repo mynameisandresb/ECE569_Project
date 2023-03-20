@@ -1,13 +1,10 @@
-#include "utils.h"
-
-/*
 * Specify the size of a THREAD BLOCK of sizze THREAD_SIZE x THREAD_SIZE
 */
-#define THREAD_SIZE 11
+#define THREAD_SIZE 22
 /*
 * Flag whether to use separable gaussian filter or 2D
 */
-#define SEPARATED_GAUSSIAN_FILTER 1
+#define SEPARATED_GAUSSIAN_FILTER 0
 
 /**
 * CUDA Kernel for DSGM
@@ -34,12 +31,17 @@ void gaussian_background_kernel(unsigned char * const d_frame,
     float alpha, V;
     int adiff;
     int cdiff;
-
-    float pixel = d_frame[index];
-    float ameanpixel = d_amean[index];
-    float avarpixel = d_avar[index];
-    float cmeanpixel = d_cmean[index];
-    float cvarpixel = d_cvar[index];
+  // Adjust memory handling, utilize shared memory
+    __shared__ float pixel; 
+	pixel = d_frame[index];
+    __shared__ float ameanpixel;
+	ameanpixel = d_amean[index];
+    __shared__ float avarpixel;
+ 	avarpixel = d_avar[index];
+    __shared__ float cmeanpixel;
+ 	cmeanpixel= d_cmean[index];
+    __shared__ float cvarpixel;
+    cvarpixel = d_cvar[index];
 
     adiff = pixel - ameanpixel;
     cdiff = pixel - cmeanpixel;
@@ -108,7 +110,7 @@ void gaussian_background(unsigned char* const d_frame,
                             size_t numRows, size_t numCols)
 {
   const dim3 blockSize(THREAD_SIZE, THREAD_SIZE, 1);
-  const dim3 gridSize(numRows / THREAD_SIZE + 1, numCols / THREAD_SIZE + 1, 1); 
+  const dim3 gridSize(numRows / THREAD_SIZE + 1, numCols / THREAD_SIZE + 1, 1);
   gaussian_background_kernel<<<gridSize, blockSize>>>(d_frame, d_amean, d_cmean, 
                                               d_avar, d_cvar, d_bin, d_aage, d_cage,
                                                 numRows, numCols);
@@ -134,8 +136,10 @@ void gaussian_filter_kernel(unsigned char* d_frame,
 
   if (index >= numRows * numCols) return;
 
-  int halfway_point = d_filter_width/2;
-  float blurred_pixel = 0.0f;
+  __shared__ int halfway_point;
+  halfway_point = d_filter_width/2;
+  __shared__ float blurred_pixel;
+	blurred_pixel = 0.0f;
 
   // Iterate over 2D Gaussian kernel
   for (int i = -halfway_point; i <= halfway_point; ++i){ 
@@ -165,8 +169,9 @@ void median_filter_kernel(unsigned char* d_frame,
                      unsigned char* d_blurred,
                      size_t numRows, size_t numCols){
 
-    const int size = 9;
-    unsigned short surround[9];
+    __shared__ int size;
+	size = 3;
+    __shared__ unsigned short surround[9];
 
     int iterator, i;
 
@@ -194,14 +199,15 @@ void median_filter_kernel(unsigned char* d_frame,
 
     // simple sorting
     int middle = (size/2)+1;
-    for (i=0; i<=middle; i++) {
+    for (i=0; i<=middle; ++i) {
         int minval=i;
-        for (int l=i+1; l<size; l++){
+        for (int l=i+1; l<size; ++l){
           if (surround[l] < surround[minval]){
              minval=l;
           }
         } 
-        unsigned short temp = surround[i];
+        __shared__ unsigned short temp;
+		temp = surround[i];
         surround[i]=surround[minval];
         surround[minval]=temp;
     }
@@ -221,8 +227,8 @@ void gaussian_filter(unsigned char* d_frame,
                      size_t numRows, size_t numCols)
 {
 
-  const dim3 blockSize(THREAD_SIZE, THREAD_SIZE, 1);
-  const dim3 gridSize(numRows / THREAD_SIZE + 1, numCols / THREAD_SIZE + 1, 1); 
+  const dim3 blockSize(THREAD_SIZE, THREAD_SIZE, 12);
+  const dim3 gridSize(numRows / THREAD_SIZE + 1, numCols / THREAD_SIZE + 1, 12); 
   gaussian_filter_kernel<<<gridSize, blockSize>>>(d_frame, d_blurred, d_gfilter, 
                                                   d_filter_width, d_filter_height, 
                                                   numRows, numCols);
@@ -273,13 +279,17 @@ void gaussian_filter_kernel_separable(unsigned char* d_frame,
       h = r;
     }
     
-    size_t current_pixel_id = w + numCols * h;
-    float current_pixel = d_frame[current_pixel_id]; 
+    __shared__ size_t current_pixel_id;
+	current_pixel_id = w + numCols * h;
+    __shared__ float current_pixel;
+	current_pixel = d_frame[current_pixel_id]; 
 
     // now, get the associated weight in the filter
     current_pixel_id = (j + halfway_point); 
-    float weight = d_gfilter[current_pixel_id]; 
-    unsigned char t = current_pixel * weight; 
+    __shared__ float weight;
+	weight = d_gfilter[current_pixel_id]; 
+    __shared__ unsigned char t; 
+	t = current_pixel * weight; 
     blurred_pixel += t;
   } 
 
