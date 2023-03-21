@@ -334,7 +334,11 @@ void test_cuda(){
 
     t_parallel += t_parallel_f - t_parallel_s;
     cv::Mat temp = cv::Mat(numRows(), numCols(), CV_8UC1, binary);
-    cv::imshow("origin", dst);
+    #if PREPROCESSING == 1
+      cv::imshow("origin", dst);
+    #else
+      cv::imshow("origin", frame);
+    #endif
     cvWaitKey(1);
 
     //free up memory on the device
