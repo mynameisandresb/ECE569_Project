@@ -15,7 +15,7 @@
 // Use separable 1D filter or 2D Gaussian filter
 #define SEPARABLE_GAUSSIAN_FILTER 1
 // Do we do any preprocessing (blurring) at all?
-#define PREPROCESSING 1
+#define PREPROCESSING 0
 
 /**
 * function specifications for CUDA kernel calls
@@ -160,7 +160,7 @@ void test_cuda(){
   char buff[100];
 
   int i = 2;
-  std::string input_file = "../../Videos/sofa/input/in000001.jpg";
+  std::string input_file = "../../Videos/streetLight/input/in000001.jpg";
 
   frame = readImage(input_file);
   if(!frame.isContinuous()){
@@ -345,7 +345,7 @@ void test_cuda(){
     cleanup();
 
     //get the next frame
-    sprintf(buff, "../../Videos/sofa/input/in%06d.jpg", i++);
+    sprintf(buff, "../../Videos/streetLight/input/in%06d.jpg", i++);
     std::string buffAsStdStr = buff;
     const char * c = buffAsStdStr.c_str();
     frame = readImage(c);
@@ -361,11 +361,11 @@ void test_cuda(){
   t_serial = t_total-t_parallel;
   
   // print timing information
-  printf("%f %f %f %f %f\n", t_total, t_serial, t_parallel, t_gpu, t_parallel-t_gpu);
-  // printf("Total Execution time: %f\n", t_total);
-  // printf("Serial Execution part: %f\n", t_serial);
-  // printf("Parallel Execution part: %f\n", t_parallel);
-  // printf("Computation time for GPU: %f\n", t_gpu);
-  // printf("Communication time for GPU: %f\n", t_parallel - t_gpu);
+  // printf("%f %f %f %f %f\n", t_total, t_serial, t_parallel, t_gpu, t_parallel-t_gpu);
+  printf("Total Execution time: %f\n", t_total);
+  printf("Serial Execution part: %f\n", t_serial);
+  printf("Parallel Execution part: %f\n", t_parallel);
+  printf("Computation time for GPU: %f\n", t_gpu);
+  printf("Communication time for GPU: %f\n", t_parallel - t_gpu);
 
 }
