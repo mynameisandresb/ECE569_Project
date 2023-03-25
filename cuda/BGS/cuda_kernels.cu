@@ -1,10 +1,13 @@
+#include "utils.h"
+
+/*
 * Specify the size of a THREAD BLOCK of sizze THREAD_SIZE x THREAD_SIZE
 */
-#define THREAD_SIZE 22
+#define THREAD_SIZE 10
 /*
 * Flag whether to use separable gaussian filter or 2D
 */
-#define SEPARATED_GAUSSIAN_FILTER 1
+#define SEPARATED_GAUSSIAN_FILTER 0
 
 /**
 * CUDA Kernel for DSGM
@@ -140,13 +143,15 @@ void gaussian_filter_kernel(unsigned char* d_frame,
   halfway_point = d_filter_width/2;
   __shared__ float blurred_pixel;
 	blurred_pixel = 0.0f;
-
+ 
+  numRows = numRows-1;
+  numCols = numCols-1;
   // Iterate over 2D Gaussian kernel
   for (int i = -halfway_point; i <= halfway_point; ++i){ 
     for (int j = -halfway_point; j <= halfway_point; ++j){ 
             // get the location of the desired pixel, clamped to borders of the image
-            int h = fmin(fmax((float)(r + i), 0.f), (float)(numRows-1)); 
-            int w = fmin(fmax((float)(c + j), 0.f), (float)(numCols-1)); 
+            int h = fmin(fmax((float)(r + i), 0.f), (float)(numRows)); 
+            int w = fmin(fmax((float)(c + j), 0.f), (float)(numCols)); 
             int current_pixel_id = w + numCols * h;
             float current_pixel = static_cast<float>(d_frame[current_pixel_id]); 
 
@@ -377,5 +382,4 @@ void gaussian_and_median_blur(unsigned char* d_frame,
   
   cudaDeviceSynchronize(); checkCudaErrors(cudaGetLastError());
 }
-
 
