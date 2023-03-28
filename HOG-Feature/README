@@ -1,6 +1,6 @@
 CODE SOURCED FROM https://github.com/cchinmai19/GPU-Parallel-Programming
 
-To build and run. Make sure you have CUDA and OPEN_CV and CMAKE installed. You can probably get away with not having CMAKE if you're running Mac OS X 10.9 with installation paths through HomeBrew. However, if not.
+To build and run. Make sure you have CUDA and OPEN_CV and CMAKE installed
 
 mkdir build
 cd build
