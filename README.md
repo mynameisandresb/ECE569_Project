@@ -2,6 +2,10 @@ Source code for motion detection https://github.com/Breakend/MotionDetection
 
 Source code for HOG https://github.com/cchinmai19/GPU-Parallel-Programming
 
+HOG-Feature PDF From Source Code:
+
+https://github.com/cchinmai19/GPU-Parallel-Programming/blob/master/HOG-Feature/Hog%20Feature%20Extractor_GPU.pdf
+
 A parallelized motion detection implementation of <a href="http://ieeexplore.ieee.org/document/6595847/">Yi et al.’s dual-mode SGM background subtraction model</a>. 
 
 If you use their implementation please cite:
