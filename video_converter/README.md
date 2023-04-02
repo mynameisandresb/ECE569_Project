@@ -4,8 +4,6 @@ Simple script that converters a video into 720x480 frames stored inside a direct
 
 *Make Virtual Environment*
 
-Execute:
-
 ```
 python3 -m venv venv
 source venv/bin/activate
