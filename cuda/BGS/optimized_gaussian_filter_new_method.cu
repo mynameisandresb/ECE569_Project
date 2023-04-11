@@ -46,7 +46,7 @@ void gaussian_filter_kernel(unsigned char* d_frame,
         }
     }
 
-    d_frame[y * d_filter_width + x] = sum;
+    d_frame[y * 9 + x] = sum;
 
 }
 
