@@ -1,34 +1,52 @@
+__global__
 void gaussian_filter_kernel(unsigned char* d_frame,
                      unsigned char* d_blurred,
                      const float* const d_gfilter,
                      size_t d_filter_width,
                      size_t d_filter_height,
                      size_t numRows, size_t numCols){
+	
+   #define BLOCK_SIZE 16
+   int x = blockIdx.x * blockDim.x + threadIdx.x;
+   int y = blockIdx.y * blockDim.y + threadIdx.y;
 
-  const size_t r = blockIdx.x * blockDim.x + threadIdx.x;
-  const size_t c = blockIdx.y * blockDim.y + threadIdx.y;
-  const size_t index = r * numCols + c; //the center pixel being blurred
+   if (x >= d_filter_width || y >= d_filter_height) {
+       return;
+  }
 
-  if (index >= numRows * numCols) return;
+   float sum = 0.0f;
 
-  int halfway_point = d_filter_width/2;
-  float blurred_pixel = 0.0f;
+   float s_data[BLOCK_SIZE + 9 - 1][BLOCK_SIZE + 9- 1];
 
-  // Iterate over 2D Gaussian kernel
-  for (int i = halfway_point; i <= -halfway_point; --i){ 
-    for (int j = -halfway_point; j <= halfway_point; ++j){ 
-            __shared__ int current_pixel_id;
-			current_pixel_id = fmin(fmax((float)(c + j), 0.f), (float)(numCols-1)) + numCols * fmin(fmax((float)(r + i), 0.f), (float)(numRows-1));
-            __shared__ float current_pixel;
-			current_pixel = static_cast<float>(d_frame[current_pixel_id]); 
+   int x0 = blockIdx.x * blockDim.x - (d_filter_width - 1) / 2;
+   int y0 = blockIdx.y * blockDim.y - (d_filter_width - 1) / 2;
+   int tx = threadIdx.x;
+   int ty = threadIdx.y;
 
-            // now, get the associated weight in the filter
-            __shared__ float weight;
-			weight = d_gfilter[(i + halfway_point) * d_filter_width + j + halfway_point]; 
-            blurred_pixel += current_pixel * weight; 
-        } 
-    } 
- 
-  d_blurred[index] = static_cast<int>(blurred_pixel); 
+   s_data[ty][tx] = d_blurred[(y0 + ty) * d_filter_width + x0 + tx];
+
+    if (tx < d_filter_width - 1) {
+        s_data[ty][tx + BLOCK_SIZE] = d_blurred[(y0 + ty) * d_filter_width + x0 + tx + BLOCK_SIZE];
+    }
+
+    if (ty < d_filter_width - 1) {
+        s_data[ty + BLOCK_SIZE][tx] = d_blurred[(y0 + ty + BLOCK_SIZE) * d_filter_width + x0 + tx];
+    }
+
+    if (tx < d_filter_width - 1 && ty < d_filter_width - 1) {
+        s_data[ty + BLOCK_SIZE][tx + BLOCK_SIZE] = d_blurred[(y0 + ty + BLOCK_SIZE) * d_filter_width + x0 + tx + BLOCK_SIZE];
+    }
+
+    __syncthreads();
+
+    // Compute convolution
+    for (int i = 0; i < d_filter_width; i++) {
+        for (int j = 0; j < d_filter_width; j++) {
+            sum += s_data[ty + i][tx + j] * d_filter[i * d_filter_width + j];
+        }
+    }
+
+    d_frame[y * d_filter_width + x] = sum;
+
 }
 
