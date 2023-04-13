@@ -18,4 +18,4 @@ Once Make is successful, run the binary
 Example:
  ../bin/HOG ../HOG/gs_ua.1.jpg 1
 
-In /HOG/main.cu, function hog_feature_pull(image_data, d1_flag) is what is needed to add to add to our project program. It takes in the image data, runs against the SVM, and outputs the 0 or 1 for the classification. 
+In /HOG/main.cu, function hog_feature_pull(image_data, d1_flag) is what is needed for our project code. It takes in the image data, runs against the SVM, and outputs the 0 or 1 for the classification. 
