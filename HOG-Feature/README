@@ -19,3 +19,7 @@ Example:
  ../bin/HOG ../HOG/gs_ua.1.jpg 1
 
 In /HOG/main.cu, function hog_feature_pull(image_data, d1_flag) is what is needed for our project code. It takes in the image data, runs against the SVM, and outputs the 0 or 1 for the classification. 
+
+===============================
+train_HOG.cpp
+- Couldn't get around figuring out how to convert the libjob to feature vector that is usable for this HOG program. CV has a train HOG that creates an SVM. Running through that to create a new SVM to compare against. 
