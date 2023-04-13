@@ -16,5 +16,5 @@ Once Make is successful, run the binary
 ../bin/HOG <file name> <0 or 1> //Parameter 0 to not feature files, 1 to output feature files 
 
 Example:
- ../bin/HOG gs_ua.1.jpg 1
+ ../bin/HOG ../HOG/gs_ua.1.jpg 1
 
