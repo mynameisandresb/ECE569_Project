@@ -63,7 +63,38 @@ void gaussian_and_median_blur(unsigned char* d_frame,
 
 void test_cuda();
 
+/*
+Classification GUI Text Overlay
+*/
+void putTextOverlay(cv::Mat &frame, int frameNumber, int classification){
+  // Fonts setup
+  int fontFace = cv::FONT_HERSHEY_SIMPLEX;
+  double fontScale = 0.7;
+  int thickness = 2;
+  cv::Point textPosition(10, 30); // Position of the text (x, y)
+  cv::Scalar textColor(255, 255, 255); // White color
+  
+  // Frame text
+  std::string text = "Frame: " + std::to_string(frameNumber);
+  cv::putText(frame, text, textPosition, fontFace, fontScale, textColor, thickness, cv::LINE_AA);
 
+  // Classification text
+  const char* classificationStr;
+
+  if(classification==0){
+      classificationStr = "UA";
+  }
+  else if(classification==1){
+      classificationStr = "ASU";
+  }
+  else {
+      classificationStr = "negative";
+  }
+
+  std::string textClassification = "Classification: " + std::string(classificationStr);
+  cv::Point textPositionClassification(10, 60); // Position of the text (x, y)
+  cv::putText(frame, textClassification, textPositionClassification, fontFace, fontScale, textColor, thickness, cv::LINE_AA);
+}
 
 //include the definitions of the above functions for the kernel calls
 #include "cuda_mem_functions.cpp"
@@ -160,7 +191,7 @@ void test_cuda(){
   char buff[100];
 
   int i = 2;
-  std::string input_file = "../../Videos/logos/input/in000001.jpg";
+  std::string input_file = "../../data/in000001.jpg";
 
   frame = readImage(input_file);
   if(!frame.isContinuous()){
@@ -331,11 +362,30 @@ void test_cuda(){
     checkCudaErrors(cudaMemcpy(c_age, d_cage, sizeof(int) * numPixels, cudaMemcpyDeviceToHost));
 
     t_parallel_f = cpu_timer();
-
     t_parallel += t_parallel_f - t_parallel_s;
-    cv::Mat temp = cv::Mat(numRows(), numCols(), CV_8UC1, binary);
+
+    //-------------------------------------------------------------HOG Feature-------------------------------------------------------------------------
+    // HOG Feature extraction
+    // ...code here
+    // hogFeature() // run function input the image to extract features, use HOG features image for SVM
+
+    //-------------------------------------------------------------SVM Classification-------------------------------------------------------------------------
+    // SVM object classification using the HOG Feature extraction
+    // ...code here
+    // Take HOG feature image input and output the classification integer 
+
+    // The SVM classification result
+    int hogSVMClassification = 0; // 0 = UA, 1 = ASU, -1 = negative
+
+    //-------------------------------------------------------------Display Results Video-------------------------------------------------------------------------
+    // Show the window video of the original images
+    putTextOverlay(dst, i, hogSVMClassification); // Add classification text overlay
     cv::imshow("origin", dst);
     cvWaitKey(1);
+
+    // Show the window video of the modified images
+    cv::Mat temp = cv::Mat(numRows(), numCols(), CV_8UC1, binary); // binary into Mat to display
+    putTextOverlay(temp, i, hogSVMClassification); // Add classification text overlay
     cv::imshow("result", temp);
     cvWaitKey(1);
 
@@ -343,7 +393,7 @@ void test_cuda(){
     cleanup();
 
     //get the next frame
-    sprintf(buff, "../../Videos/logos/input/in%06d.jpg", i++);
+    sprintf(buff, "../../data/in%06d.jpg", i++);
     std::string buffAsStdStr = buff;
     const char * c = buffAsStdStr.c_str();
     frame = readImage(c);
