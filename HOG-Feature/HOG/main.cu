@@ -657,8 +657,8 @@ __global__ void display_kernel_v2(float *Displayhistogram, uchar *GPU_odata, Dis
 }
 
 
-
-void hogFeature(){
+// hogFeature takes in Mat image and returns the Mat image of the HOG features extracted
+Mat hogFeature(Mat image){
 	
 	//-------------------------------------------------------------variables-------------------------------------------------------------------------
 	//int i;
@@ -687,7 +687,7 @@ void hogFeature(){
   // hp.NumBins= 9; //atoi(argv[6]); 
   // hp.Orientation= 0; //atoi(argv[7]);
 
-  // Using input arguments 
+  // Using input arguments for collecting results comparison data for all of them
   // Cal_kernel_v = atoi(argv[3]);
   // Cell_kernel_v = atoi(argv[4]);
   // Block_kernel_v = atoi(argv[5]);
@@ -701,90 +701,91 @@ void hogFeature(){
   hp.NumBins= 9; //atoi(argv[6]); 
   hp.Orientation= 0; //atoi(argv[7]);
 
-  // Using optimized kernels set
+  // Using optimized kernels versions for performance set
   Cal_kernel_v = 1; //atoi(argv[3]);
   Cell_kernel_v = 2; //atoi(argv[4]);
   Block_kernel_v = 3; //atoi(argv[5]);
   Display_Cell_kernel_v = 1; //atoi(argv[6]);
   display_kernel_v = 1; //atoi(argv[7]);
 
-  printf("\n\n-----------------------------------------------------------------------------------");
-  printf("\n\nRunning Cal_kernel_v # = %d", Cal_kernel_v);
-  printf("\n\nRunning Cell_kernel_v # = %d", Cell_kernel_v);
-  printf("\n\nRunning Block_kernel_v # = %d", Block_kernel_v);
-  printf("\n\nRunning Display_Cell_kernel_v # = %d", Display_Cell_kernel_v);
-  printf("\n\nRunning display_kernel_v # = %d", display_kernel_v);
-  printf("\n\n-----------------------------------------------------------------------------------");
+  // Display kernels versions used for testing and collecting results
+  // printf("\n\n-----------------------------------------------------------------------------------");
+  // printf("\n\nRunning Cal_kernel_v # = %d", Cal_kernel_v);
+  // printf("\n\nRunning Cell_kernel_v # = %d", Cell_kernel_v);
+  // printf("\n\nRunning Block_kernel_v # = %d", Block_kernel_v);
+  // printf("\n\nRunning Display_Cell_kernel_v # = %d", Display_Cell_kernel_v);
+  // printf("\n\nRunning display_kernel_v # = %d", display_kernel_v);
+  // printf("\n\n-----------------------------------------------------------------------------------");
 
-  if(Cal_kernel_v>1) {
-		printf("\n\nCal_kernel_v = %d is invalid", Cal_kernel_v);
-		exit(EXIT_FAILURE);
-	}
+  // Removed EXIT_FAILURE checks below since they are hard coded in now
+  // if(Cal_kernel_v>1) {
+	// 	printf("\n\nCal_kernel_v = %d is invalid", Cal_kernel_v);
+	// 	exit(EXIT_FAILURE);
+	// }
 
-    if(Cell_kernel_v>2) {
-		printf("\n\nCell_kernel_v = %d is invalid", Cell_kernel_v);
-		exit(EXIT_FAILURE);
-	}
+  //   if(Cell_kernel_v>2) {
+	// 	printf("\n\nCell_kernel_v = %d is invalid", Cell_kernel_v);
+	// 	exit(EXIT_FAILURE);
+	// }
 
-  if(Block_kernel_v>3) {
-		printf("\n\nBlock_kernel_v = %d is invalid", Block_kernel_v);
-		exit(EXIT_FAILURE);
-	}
+  // if(Block_kernel_v>3) {
+	// 	printf("\n\nBlock_kernel_v = %d is invalid", Block_kernel_v);
+	// 	exit(EXIT_FAILURE);
+	// }
 
-  if(Display_Cell_kernel_v>1) {
-		printf("\n\nDisplay_Cell_kernel_v = %d is invalid", Display_Cell_kernel_v);
-		exit(EXIT_FAILURE);
-	}
+  // if(Display_Cell_kernel_v>1) {
+	// 	printf("\n\nDisplay_Cell_kernel_v = %d is invalid", Display_Cell_kernel_v);
+	// 	exit(EXIT_FAILURE);
+	// }
 
-  if(display_kernel_v>2) {
-		printf("\n\ndisplay_kernel_v = %d is invalid", display_kernel_v);
-		exit(EXIT_FAILURE);
-	}
+  // if(display_kernel_v>2) {
+	// 	printf("\n\ndisplay_kernel_v = %d is invalid", display_kernel_v);
+	// 	exit(EXIT_FAILURE);
+	// }
 	
-	if(hp.CellSize<2 | hp.CellSize> 32) {
-		printf("\n\nCellSize = %d is invalid",hp.CellSize);
-		printf("\n Cell Size can be an integer between 2 and 32\n");
-		exit(EXIT_FAILURE);
-	}
+	// if(hp.CellSize<2 | hp.CellSize> 32) {
+	// 	printf("\n\nCellSize = %d is invalid",hp.CellSize);
+	// 	printf("\n Cell Size can be an integer between 2 and 32\n");
+	// 	exit(EXIT_FAILURE);
+	// }
 	
-	if(hp.BlockSize<0 | hp.BlockSize> 16) {
-		printf("\n\nBlockSize = %d is invalid",hp.BlockSize);
-		printf("\n Block Size can be an integer between 1 and 8\n");
-		exit(EXIT_FAILURE);
-	}
+	// if(hp.BlockSize<0 | hp.BlockSize> 16) {
+	// 	printf("\n\nBlockSize = %d is invalid",hp.BlockSize);
+	// 	printf("\n Block Size can be an integer between 1 and 8\n");
+	// 	exit(EXIT_FAILURE);
+	// }
 
-	if(hp.BlockOverlap<0 | hp.BlockOverlap> hp.BlockSize-1) {
-		printf("\n\nBlockSize = %d is invalid",hp.BlockOverlap);
-		printf("\n Block overlap can be an integer between 0 and %d\n",hp.BlockSize-1);
-		exit(EXIT_FAILURE);
-	}
+	// if(hp.BlockOverlap<0 | hp.BlockOverlap> hp.BlockSize-1) {
+	// 	printf("\n\nBlockSize = %d is invalid",hp.BlockOverlap);
+	// 	printf("\n Block overlap can be an integer between 0 and %d\n",hp.BlockSize-1);
+	// 	exit(EXIT_FAILURE);
+	// }
 	
-	if(hp.NumBins<4 | hp.NumBins> 180) {
-		printf("\n\nNumBins = %d is invalid",hp.NumBins);
-		printf("\nNumber of bins can be an integer between 0 and 180\n");
-		exit(EXIT_FAILURE);
-	}
+	// if(hp.NumBins<4 | hp.NumBins> 180) {
+	// 	printf("\n\nNumBins = %d is invalid",hp.NumBins);
+	// 	printf("\nNumber of bins can be an integer between 0 and 180\n");
+	// 	exit(EXIT_FAILURE);
+	// }
 	
-	if(hp.Orientation<0 | hp.Orientation>1) {
-		printf("\n\nOrientation = %d is invalid",hp.Orientation);
-		printf("\n Orientation can be either 0 or 1\n");
-		exit(EXIT_FAILURE);
-	}
+	// if(hp.Orientation<0 | hp.Orientation>1) {
+	// 	printf("\n\nOrientation = %d is invalid",hp.Orientation);
+	// 	printf("\n Orientation can be either 0 or 1\n");
+	// 	exit(EXIT_FAILURE);
+	// }
  
-  printf("\n\nPARAMETERS:\n\n");
-  printf("CellSize=%d, BlockSize=%d, BlockOverlap=%d, NumBins=%d, Orientation=%d\n",hp.CellSize,hp.BlockSize,hp.BlockOverlap,hp.NumBins,hp.Orientation);
+  // Comment printf out for project
+  // printf("\n\nPARAMETERS:\n\n");
+  // printf("CellSize=%d, BlockSize=%d, BlockOverlap=%d, NumBins=%d, Orientation=%d\n",hp.CellSize,hp.BlockSize,hp.BlockOverlap,hp.NumBins,hp.Orientation);
 	//===============================================================================================================================================
 
-	//----------------------------------------------------------------Load Image---------------------------------------------------------------------
-	Mat image;	// see http://docs.opencv.org/modules/core/doc/basic_structures.html#mat
-  const char* imageFile = "../../data/in000238.jpg";
-	image = imread(imageFile, CV_LOAD_IMAGE_GRAYSCALE); //Load Grayscale image argv[1]
-	
 	if(! image.data ) {
 		fprintf(stderr, "Could not open or find the image.\n");
 		exit(EXIT_FAILURE);
 	}
-	printf("Loaded image '%s', size = %dx%d (dims = %d).\n\n", imageFile, image.rows, image.cols, image.dims); // argv[1]
+
+  // Comment printf out for project
+	// printf("Loaded image: size = %dx%d (dims = %d).\n\n", image.rows, image.cols, image.dims); // argv[1]
+
 	hp.ImgRow=image.rows;
 	hp.ImgCol=image.cols;
   hp.ImgSize=hp.ImgRow*hp.ImgCol;
@@ -795,11 +796,13 @@ void hogFeature(){
   hp.BlockCol=(hp.CellCol-hp.BlockSize+1)/(hp.BlockSize-hp.BlockOverlap);
   hp.TotalBlocks=hp.BlockRow*hp.BlockCol;
   hp.FeatureSize=hp.NumBins*hp.BlockSize*hp.BlockSize;
-  printf("----------------------------------IMAGE DIVIDED INTO CELL HISTOGRAM----------------\n");
-  printf("\nCell_rows = %d, Cell_columns = %d, Total_cells = %d\n",hp.CellRow,hp.CellCol,hp.TotalCells);
-	printf("\nBlock_rows = %d, Block_columns = %d, Total_blocks = %d\n",hp.BlockRow,hp.BlockCol,hp.TotalBlocks);
-  printf("\nfeaturesize=%d\n",hp.FeatureSize);
-  printf("-----------------------------------------------------------------------------------\n\n");
+
+  // Comment printf out for project
+  // printf("----------------------------------IMAGE DIVIDED INTO CELL HISTOGRAM----------------\n");
+  // printf("\nCell_rows = %d, Cell_columns = %d, Total_cells = %d\n",hp.CellRow,hp.CellCol,hp.TotalCells);
+	// printf("\nBlock_rows = %d, Block_columns = %d, Total_blocks = %d\n",hp.BlockRow,hp.BlockCol,hp.TotalBlocks);
+  // printf("\nfeaturesize=%d\n",hp.FeatureSize);
+  // printf("-----------------------------------------------------------------------------------\n\n");
   
   dp.ImgRow=hp.ImgRow;
   dp.ImgCol=hp.ImgCol;
@@ -816,10 +819,13 @@ void hogFeature(){
   dp.DisplayImgRow=dp.DisplayCellSize*dp.CellRow;
   dp.DisplayImgCol=dp.DisplayCellSize*dp.CellCol;
   dp.DisplayImgSize=dp.DisplayImgCol*dp.DisplayImgRow;
-  printf("----------------------IMAGE DIVIDED INTO CELL HISTOGRAM FOR DISPLAYING-------------\n");
-  printf("\nCell_rows = %d, Cell_columns = %d, Total_cells=%d, Cell_size=%d, Horz_cells=%d\n",dp.CellRow,dp.CellCol,dp.TotalCells,dp.CellSize,dp.HorzCells);
-  printf("\nDisplay_rows = %d, Display_columns = %d, Total_pixels=%d, Cell_size=%d\n",dp.DisplayImgRow,dp.DisplayImgCol,dp.DisplayImgSize,dp.DisplayCellSize);
-  printf("-----------------------------------------------------------------------------------\n\n");
+
+  // Comment printf out for project
+  // printf("----------------------IMAGE DIVIDED INTO CELL HISTOGRAM FOR DISPLAYING-------------\n");
+  // printf("\nCell_rows = %d, Cell_columns = %d, Total_cells=%d, Cell_size=%d, Horz_cells=%d\n",dp.CellRow,dp.CellCol,dp.TotalCells,dp.CellSize,dp.HorzCells);
+  // printf("\nDisplay_rows = %d, Display_columns = %d, Total_pixels=%d, Cell_size=%d\n",dp.DisplayImgRow,dp.DisplayImgCol,dp.DisplayImgSize,dp.DisplayCellSize);
+  // printf("-----------------------------------------------------------------------------------\n\n");
+
   //===============================================================================================================================================	
 
 	//---------------------------------------------------Create CPU memory to store the output-------------------------------------------------------
@@ -831,6 +837,7 @@ void hogFeature(){
   memcpy(CPU_InputArray,image.data,hp.ImgSize);
   checkCuda(launch_helper(GPURuntimes));
   
+  // Comment printf out for project (still shown for testing)
 	printf("-----------------------------------------------------------------\n");
 	printf("Tfr CPU->GPU = %5.2f ms ... \nExecution = %5.2f ms ... \nTfr GPU->CPU = %5.2f ms   \n Total=%5.2f ms\n",
 			GPURuntimes[1], GPURuntimes[2], GPURuntimes[3], GPURuntimes[0]);
@@ -839,7 +846,7 @@ void hogFeature(){
   // Output the HOG features to the SVM classifier 
   Mat hogFeatureOutput = Mat(dp.DisplayImgRow, dp.DisplayImgCol, CV_8UC1, CPU_OutputArray);
 
-  // No need to save output to file in our project
+  // No need to save output to file in our project (uncomment show for testing to look at image HOG features are correct)
   // if (!imwrite("output.bmp", hogFeatureOutput)) { //argv[2]
 	// 	fprintf(stderr, "couldn't write output to disk!\n");
 	// 	cudaFreeHost(CPU_OutputArray);
@@ -858,6 +865,8 @@ void hogFeature(){
 	cudaFreeHost(CPU_FeatureArray);
   printf("\n\n...EXECUTION COMPLETED...\n\n");
   exit(EXIT_SUCCESS);
+
+  return hogFeatureOutput; // return the HOG Feature image output for the SVM
 }
 
 
@@ -867,8 +876,13 @@ void hogFeature(){
 //###################################################################################################################################################
 // Remove main below when integrating into other main.cpp to call hogFeature() there to combine projects
 int main(int argc, char *argv[]) {
+  //----------------------------------------------------------------Load Image---------------------------------------------------------------------
+	Mat image;	// see http://docs.opencv.org/modules/core/doc/basic_structures.html#mat
+  const char* imageFile = "../../data/in000238.jpg";
+	image = imread(imageFile, CV_LOAD_IMAGE_GRAYSCALE); //Load Grayscale image argv[1]
+
   // Hog Feature extraction, input the modified image binary then use HOG feature output for SVM
-  hogFeature();
+  hogFeature(image);
 }
 
 cudaError_t launch_helper(float* Runtimes){
