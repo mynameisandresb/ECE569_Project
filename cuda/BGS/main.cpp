@@ -64,6 +64,11 @@ void gaussian_and_median_blur(unsigned char* d_frame,
 void test_cuda();
 
 /*
+HOG-Feature 
+*/
+cv::Mat hogFeature(cv::Mat image);
+
+/*
 Classification GUI Text Overlay
 */
 void putTextOverlay(cv::Mat &frame, int frameNumber, int classification){
@@ -365,14 +370,19 @@ void test_cuda(){
     t_parallel += t_parallel_f - t_parallel_s;
 
     //-------------------------------------------------------------HOG Feature-------------------------------------------------------------------------
-    // HOG Feature extraction
-    // ...code here
-    // hogFeature() // run function input the image to extract features, use HOG features image for SVM
+    cv::Mat imageHogInput = cv::Mat(numRows(), numCols(), CV_8UC1, binary);
+
+    // Hog Feature extraction, input the modified image binary then use HOG feature output for SVM
+
+    // Need to debug and fix error: invalid argument cudaGetLastError()
+    // Commented out hogFeature from running for now so it will still run
+    // Uncomment to run it with the hogFeature and it only runs 1 time then gets error to debug
+    // cv::Mat hogFeatureOutput = hogFeature(imageHogInput); // for SVM input HOG features image
 
     //-------------------------------------------------------------SVM Classification-------------------------------------------------------------------------
     // SVM object classification using the HOG Feature extraction
     // ...code here
-    // Take HOG feature image input and output the classification integer 
+    // Take hogFeatureOutput image for the input for the SVM 
 
     // The SVM classification result
     int hogSVMClassification = 0; // 0 = UA, 1 = ASU, -1 = negative
@@ -384,7 +394,7 @@ void test_cuda(){
     cvWaitKey(1);
 
     // Show the window video of the modified images
-    cv::Mat temp = cv::Mat(numRows(), numCols(), CV_8UC1, binary); // binary into Mat to display
+    cv::Mat temp = cv::Mat(numRows(), numCols(), CV_8UC1, binary);
     putTextOverlay(temp, i, hogSVMClassification); // Add classification text overlay
     cv::imshow("result", temp);
     cvWaitKey(1);
