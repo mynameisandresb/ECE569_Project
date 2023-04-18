@@ -196,7 +196,7 @@ void test_cuda(){
   char buff[100];
 
   int i = 2;
-  std::string input_file = "../../data/in000001.jpg";
+  std::string input_file = "/home/u30/andresbarragan/ece569/MotionDetection/Videos/logos/input/in000001.jpg";
 
   frame = readImage(input_file);
   if(!frame.isContinuous()){
@@ -377,7 +377,7 @@ void test_cuda(){
     // Need to debug and fix error: invalid argument cudaGetLastError()
     // Commented out hogFeature from running for now so it will still run
     // Uncomment to run it with the hogFeature and it only runs 1 time then gets error to debug
-    // cv::Mat hogFeatureOutput = hogFeature(imageHogInput); // for SVM input HOG features image
+    cv::Mat hogFeatureOutput = hogFeature(imageHogInput); // for SVM input HOG features image
 
     //-------------------------------------------------------------SVM Classification-------------------------------------------------------------------------
     // SVM object classification using the HOG Feature extraction
@@ -403,7 +403,7 @@ void test_cuda(){
     cleanup();
 
     //get the next frame
-    sprintf(buff, "../../data/in%06d.jpg", i++);
+    sprintf(buff, "/home/u30/andresbarragan/ece569/MotionDetection/Videos/logos/input/in%06d.jpg", i++);
     std::string buffAsStdStr = buff;
     const char * c = buffAsStdStr.c_str();
     frame = readImage(c);
