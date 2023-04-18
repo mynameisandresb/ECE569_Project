@@ -514,6 +514,8 @@ int Block_kernel_v;
 int Display_Cell_kernel_v;
 int display_kernel_v;
 
+bool firstRun = true;
+
 //-------------------------------------------------------------Cal_kernel-------------------------------------------------------------------------
 
 // Cal_kernel Original Version 0
@@ -1091,6 +1093,15 @@ __global__ void display_kernel_v2(float *Displayhistogram, uchar *GPU_odata, Dis
   if(k == 0) GPU_odata[tempid] = 255;
 }
 
+void writeImageToFile(Mat image){
+  if (!imwrite("HOG-Feature_output.bmp", image)) {
+		fprintf(stderr, "couldn't write output to disk!\n");
+		cudaFreeHost(CPU_OutputArray);
+    cudaFreeHost(CPU_InputArray);
+	  cudaFreeHost(CPU_FeatureArray);
+		exit(EXIT_FAILURE);
+	}
+}
 
 // hogFeature takes in Mat image and returns the Mat image of the HOG features extracted
 Mat hogFeature(Mat image){
@@ -1108,11 +1119,11 @@ Mat hogFeature(Mat image){
   hp.Orientation= 0; //atoi(argv[7]);
 
   // Using optimized kernels versions for performance set
-  Cal_kernel_v = 1; //atoi(argv[3]);
-  Cell_kernel_v = 2; //atoi(argv[4]);
-  Block_kernel_v = 3; //atoi(argv[5]);
-  Display_Cell_kernel_v = 1; //atoi(argv[6]);
-  display_kernel_v = 1; //atoi(argv[7]);
+  Cal_kernel_v = 0; //atoi(argv[3]);
+  Cell_kernel_v = 0; //atoi(argv[4]);
+  Block_kernel_v = 0; //atoi(argv[5]);
+  Display_Cell_kernel_v = 0; //atoi(argv[6]);
+  display_kernel_v = 0; //atoi(argv[7]);
 
 	if(! image.data ) {
 		fprintf(stderr, "Could not open or find the image.\n");
@@ -1169,12 +1180,18 @@ Mat hogFeature(Mat image){
   checkCuda(cudaMallocHost ((void**)&CPU_FeatureArray,hp.TotalBlocks*sizeof(float)*hp.FeatureSize));	
   memcpy(CPU_InputArray,image.data,hp.ImgSize);
   checkCuda(launch_helper(GPURuntimes));
-	printf("Tfr CPU->GPU = %5.2f ms ... \nExecution = %5.2f ms ... \nTfr GPU->CPU = %5.2f ms   \n Total=%5.2f ms\n",
-			GPURuntimes[1], GPURuntimes[2], GPURuntimes[3], GPURuntimes[0]);
 
   // Output the HOG features to the SVM classifier 
   Mat hogFeatureOutput = Mat(dp.DisplayImgRow, dp.DisplayImgCol, CV_8UC1, CPU_InputArray);
- 
+
+  if(firstRun){
+    printf("----------------------------------HOG Feature Timings----------------\n");
+	  printf("Tfr CPU->GPU = %5.2f ms ... \nExecution = %5.2f ms ... \nTfr GPU->CPU = %5.2f ms   \n Total=%5.2f ms\n", GPURuntimes[1], GPURuntimes[2], GPURuntimes[3], GPURuntimes[0]);
+    printf("-----------------------------------------------------------------------------------\n\n");
+    writeImageToFile(hogFeatureOutput);
+    firstRun = false;
+  }
+
   cudaFreeHost(CPU_OutputArray);
   cudaFreeHost(CPU_InputArray);
   cudaFreeHost(CPU_Hist);	
@@ -1254,42 +1271,36 @@ cudaError_t launch_helper(float* Runtimes){
  // Cell_kernel
  checkCuda(cudaMallocHost ((void**)&GPU_CellHistogram,hp.TotalCells*sizeof(float)*hp.NumBins));
 
-// $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-//  // Call the kernel
-//  if(Cell_kernel_v==1){
-//   // Optimized Cell_kernel 3D
-//   // Update threadsPerBlock to include the hp.CellSize in the z-dimension
-//   threadsPerBlock.x = BOX_SIZE;
-//   threadsPerBlock.y = BOX_SIZE;
-//   threadsPerBlock.z = hp.CellSize * hp.CellSize;
+ // Call the kernel
+ if(Cell_kernel_v==1){
+  // Optimized Cell_kernel 3D
+  // Update threadsPerBlock to include the hp.CellSize in the z-dimension
+  threadsPerBlock.x = BOX_SIZE;
+  threadsPerBlock.y = BOX_SIZE;
+  threadsPerBlock.z = hp.CellSize * hp.CellSize;
 
-//   // Update numBlocks definition
-//   numBlocks.x = (int)ceil(hp.CellRow / (float)threadsPerBlock.x);
-//   numBlocks.y = (int)ceil(hp.CellCol / (float)threadsPerBlock.y);
+  // Update numBlocks definition
+  numBlocks.x = (int)ceil(hp.CellRow / (float)threadsPerBlock.x);
+  numBlocks.y = (int)ceil(hp.CellCol / (float)threadsPerBlock.y);
 
-//   Cell_kernel_v1<<<numBlocks, threadsPerBlock, 0, stream[0]>>>(GPU_CellHistogram, Orientation, Gradient, hp);
-//  } else if(Cell_kernel_v==2){
-//   // Optimized Cell_kernel 3D
-//   // Update threadsPerBlock to include the hp.CellSize in the z-dimension
-//   threadsPerBlock.x = BOX_SIZE;
-//   threadsPerBlock.y = BOX_SIZE;
-//   threadsPerBlock.z = hp.CellSize * hp.CellSize;
+  Cell_kernel_v1<<<numBlocks, threadsPerBlock, 0, stream[0]>>>(GPU_CellHistogram, Orientation, Gradient, hp);
+ } else if(Cell_kernel_v==2){
+  // Optimized Cell_kernel 3D
+  // Update threadsPerBlock to include the hp.CellSize in the z-dimension
+  threadsPerBlock.x = BOX_SIZE;
+  threadsPerBlock.y = BOX_SIZE;
+  threadsPerBlock.z = hp.CellSize * hp.CellSize;
 
-//   // Update numBlocks definition
-//   numBlocks.x = (int)ceil(hp.CellRow / (float)threadsPerBlock.x);
-//   numBlocks.y = (int)ceil(hp.CellCol / (float)threadsPerBlock.y);
+  // Update numBlocks definition
+  numBlocks.x = (int)ceil(hp.CellRow / (float)threadsPerBlock.x);
+  numBlocks.y = (int)ceil(hp.CellCol / (float)threadsPerBlock.y);
 
-//   Cell_kernel_v2<<<numBlocks, threadsPerBlock, 0, stream[0]>>>(GPU_CellHistogram, Orientation, Gradient, hp);
-//  } else {
-//   threadsPerBlock = dim3(BOX_SIZE, BOX_SIZE);
-//   numBlocks = dim3((int)ceil(hp.CellRow / (float)threadsPerBlock.x), (int)ceil(hp.CellCol / (float)threadsPerBlock.y));
-//   Cell_kernel_v0<<<numBlocks, threadsPerBlock, 0, stream[0]>>>(GPU_CellHistogram, Orientation, Gradient, hp);
-//  }
-// $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-
+  Cell_kernel_v2<<<numBlocks, threadsPerBlock, 0, stream[0]>>>(GPU_CellHistogram, Orientation, Gradient, hp);
+ } else {
   threadsPerBlock = dim3(BOX_SIZE, BOX_SIZE);
   numBlocks = dim3((int)ceil(hp.CellRow / (float)threadsPerBlock.x), (int)ceil(hp.CellCol / (float)threadsPerBlock.y));
   Cell_kernel_v0<<<numBlocks, threadsPerBlock, 0, stream[0]>>>(GPU_CellHistogram, Orientation, Gradient, hp);
+ }
 
  //-------------------------------------------------------------display_kernel-------------------------------------------------------------------------
   // display_kernel
@@ -1304,17 +1315,13 @@ cudaError_t launch_helper(float* Runtimes){
  numBlocks = dim3((int)ceil(dp.CellRow / (float)threadsPerBlock.x), (int)ceil(dp.CellCol / (float)threadsPerBlock.y));
 //  //printf("\n\n...%d %d...\n\n",numBlocks.x,numBlocks.y); 
 
-// $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-//  if(display_kernel_v==1){
-//   display_kernel_v1<<<numBlocks, threadsPerBlock,0,stream[1]>>>(Displayhistogram,GPU_odata,dp);
-//  } else if(display_kernel_v==2){
-//   display_kernel_v2<<<numBlocks, threadsPerBlock,0,stream[1]>>>(Displayhistogram,GPU_odata,dp);
-//  } else {
-//   display_kernel_v0<<<numBlocks, threadsPerBlock,0,stream[1]>>>(Displayhistogram,GPU_odata,dp);
-//  }
- // $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\
-
-display_kernel_v0<<<numBlocks, threadsPerBlock,0,stream[1]>>>(Displayhistogram,GPU_odata,dp);
+ if(display_kernel_v==1){
+  display_kernel_v1<<<numBlocks, threadsPerBlock,0,stream[1]>>>(Displayhistogram,GPU_odata,dp);
+ } else if(display_kernel_v==2){
+  display_kernel_v2<<<numBlocks, threadsPerBlock,0,stream[1]>>>(Displayhistogram,GPU_odata,dp);
+ } else {
+  display_kernel_v0<<<numBlocks, threadsPerBlock,0,stream[1]>>>(Displayhistogram,GPU_odata,dp);
+ }
 
  //-------------------------------------------------------------Block_kernel-------------------------------------------------------------------------
  // Block_kernel
@@ -1323,19 +1330,15 @@ display_kernel_v0<<<numBlocks, threadsPerBlock,0,stream[1]>>>(Displayhistogram,G
  numBlocks = dim3((int)ceil(hp.BlockRow / (float)threadsPerBlock.x), (int)ceil(hp.BlockCol / (float)threadsPerBlock.y));
  //printf("\n\n...%d %d...\n\n",numBlocks.x,numBlocks.y); 
 
-// $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-//  if(Block_kernel_v==1){
-//   Block_kernel_v1<<<numBlocks, threadsPerBlock,0,stream[0]>>>(GPU_BlockHistogram, GPU_CellHistogram, hp);
-//  } else if(Block_kernel_v==2){
-//   Block_kernel_v2<<<numBlocks, threadsPerBlock,0,stream[0]>>>(GPU_BlockHistogram, GPU_CellHistogram, hp);
-//  } else if(Block_kernel_v==3){
-//   Block_kernel_v3<<<numBlocks, threadsPerBlock,0,stream[0]>>>(GPU_BlockHistogram, GPU_CellHistogram, hp);
-//  } else {
-//   Block_kernel_v0<<<numBlocks, threadsPerBlock,0,stream[0]>>>(GPU_BlockHistogram, GPU_CellHistogram, hp);
-//  }
-// $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-
-Block_kernel_v0<<<numBlocks, threadsPerBlock,0,stream[0]>>>(GPU_BlockHistogram, GPU_CellHistogram, hp);
+ if(Block_kernel_v==1){
+  Block_kernel_v1<<<numBlocks, threadsPerBlock,0,stream[0]>>>(GPU_BlockHistogram, GPU_CellHistogram, hp);
+ } else if(Block_kernel_v==2){
+  Block_kernel_v2<<<numBlocks, threadsPerBlock,0,stream[0]>>>(GPU_BlockHistogram, GPU_CellHistogram, hp);
+ } else if(Block_kernel_v==3){
+  Block_kernel_v3<<<numBlocks, threadsPerBlock,0,stream[0]>>>(GPU_BlockHistogram, GPU_CellHistogram, hp);
+ } else {
+  Block_kernel_v0<<<numBlocks, threadsPerBlock,0,stream[0]>>>(GPU_BlockHistogram, GPU_CellHistogram, hp);
+ }
 
 //  //-------------------------------------------------------------Timings-------------------------------------------------------------------------
  cudaEventRecord(time3, 0);
