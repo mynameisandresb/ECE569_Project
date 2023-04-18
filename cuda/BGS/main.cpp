@@ -11,7 +11,7 @@
 #include "filter.h"
 
 // Do we use OpenCV's Gaussian and median blurring
-#define OPENCV_PROPROCESS 1
+#define OPENCV_PROPROCESS 0
 // Use separable 1D filter or 2D Gaussian filter
 #define SEPARABLE_GAUSSIAN_FILTER 1
 // Do we do any preprocessing (blurring) at all?
@@ -45,7 +45,21 @@ One dimensional, separable convolution
 */
 void gaussian_filter_separable(unsigned char* d_frame,
                      unsigned char* d_blurred,
-                    unsigned char* d_blurred_temp,
+                     unsigned char* d_blurred_temp,
+                     const float* const d_gfilter,
+                     size_t d_filter_size,
+                     size_t numRows, size_t numCols);
+
+void gaussian_and_median_blur(unsigned char* d_frame,
+                     unsigned char* d_blurred,
+                     unsigned char* d_blurred_temp,
+                     const float* const d_gfilter,
+                     size_t d_filter_size,
+                     size_t numRows, size_t numCols);
+
+void gaussian_and_median_shared_blur(unsigned char* d_frame,
+                     unsigned char* d_blurred,
+                     unsigned char* d_blurred_temp,
                      const float* const d_gfilter,
                      size_t d_filter_size,
                      size_t numRows, size_t numCols);
@@ -54,11 +68,8 @@ void median_filter(unsigned char* d_frame,
                      unsigned char* d_blurred,
                      size_t numRows, size_t numCols);
 
-void gaussian_and_median_blur(unsigned char* d_frame,
+void median_filter_shared(unsigned char* d_frame,
                      unsigned char* d_blurred,
-                     unsigned char* d_blurred_temp,
-                     const float* const d_gfilter,
-                     size_t d_filter_size,
                      size_t numRows, size_t numCols);
 
 void test_cuda();
@@ -114,7 +125,7 @@ void test_cuda(){
   /*
   * Timing variables
   */
-    double t_parallel_s, t_gpu, t_communication_s, t_total_s;
+    double t_parallel_s, t_background, t_communication_s, t_total_s, t_filter;
     double t_parallel_f, t_communication_f, t_total_f;
     double t_serial, t_parallel, t_communication, t_total;
     t_total_s = cpu_timer();
@@ -267,17 +278,31 @@ void test_cuda(){
 
         preprocessGaussianBlur(&frame, &d_frame_to_blur, &d_frame_blurred, &d_blurred_temp, BLUR_SIZE);
         timer.Start();
-        gaussian_and_median_blur(d_frame_to_blur,
+        // gaussian_and_median_blur(d_frame_to_blur,
+        //                 d_frame_blurred,
+        //                 d_blurred_temp,
+        //                 d_gaussian_filter,
+        //                 BLUR_SIZE,
+        //                 numRows(), numCols());
+        gaussian_and_median_shared_blur(d_frame_to_blur,
                         d_frame_blurred,
                         d_blurred_temp,
                         d_gaussian_filter,
                         BLUR_SIZE,
                         numRows(), numCols());
+        // gaussian_filter(d_frame_to_blur,
+        //                 d_blurred_temp,
+        //                 d_gaussian_filter,
+        //                 BLUR_SIZE, BLUR_SIZE,
+        //                 numRows(), numCols());
+        // median_filter(d_frame_to_blur,
+        //                 d_frame_blurred,
+        //                 numRows(), numCols());
 
         timer.Stop();
         cudaDeviceSynchronize(); checkCudaErrors(cudaGetLastError());
 
-        t_gpu += (timer.Elapsed()/1000);
+        t_filter += (timer.Elapsed()/1000);
         size_t numPixels = numRows()*numCols();
 
         checkCudaErrors(cudaMemcpy(blurred_frame, d_frame_blurred, sizeof(unsigned char) * numPixels, cudaMemcpyDeviceToHost));
@@ -318,7 +343,7 @@ void test_cuda(){
     timer.Stop();
     cudaDeviceSynchronize(); checkCudaErrors(cudaGetLastError());
 
-    t_gpu += (timer.Elapsed()/1000);
+    t_background += (timer.Elapsed()/1000);
     numPixels = numRows()*numCols();
 
     // Load all data back into CPU memory
@@ -358,13 +383,13 @@ void test_cuda(){
   t_total_f = cpu_timer();
   t_total = t_total_f-t_total_s;
   t_serial = t_total-t_parallel;
-  
+
   // print timing information
-  printf("%f %f %f %f %f\n", t_total, t_serial, t_parallel, t_gpu, t_parallel-t_gpu);
-  // printf("Total Execution time: %f\n", t_total);
-  // printf("Serial Execution part: %f\n", t_serial);
-  // printf("Parallel Execution part: %f\n", t_parallel);
-  // printf("Computation time for GPU: %f\n", t_gpu);
-  // printf("Communication time for GPU: %f\n", t_parallel - t_gpu);
+  printf("Total Execution time: %f\n", t_total);
+  printf("Serial Execution part: %f\n", t_serial);
+  printf("Parallel Execution part: %f\n", t_parallel);
+  printf("Computation time for filtering: %f\n", t_filter);
+  printf("Computation time for background: %f\n", t_background);
+  printf("Communication time for GPU: %f\n", t_parallel - (t_filter + t_background));
 
 }

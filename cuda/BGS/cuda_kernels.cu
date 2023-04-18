@@ -156,6 +156,7 @@ void gaussian_filter_kernel(unsigned char* d_frame,
   d_blurred[index] = static_cast<int>(blurred_pixel); 
 }
 
+
 /**
 * Median filter CUDA kernel
 * NOTE: parts of this were taken from: http://stackoverflow.com/questions/19634328/2d-cuda-median-filter-optimization
@@ -172,7 +173,7 @@ void median_filter_kernel(unsigned char* d_frame,
 
     const int x = blockDim.x * blockIdx.x + threadIdx.x;
     const int y = blockDim.y * blockIdx.y + threadIdx.y;
-    const int index = x * numCols + y;   
+    const int index = x * numCols + y;
 
     // if out of bounds return
     if( (x >= (numRows)) || (y >= numCols) || (x < 0) || (y < 0)) return;
@@ -200,7 +201,7 @@ void median_filter_kernel(unsigned char* d_frame,
           if (surround[l] < surround[minval]){
              minval=l;
           }
-        } 
+        }
         unsigned short temp = surround[i];
         surround[i]=surround[minval];
         surround[minval]=temp;
@@ -208,6 +209,87 @@ void median_filter_kernel(unsigned char* d_frame,
 
     // Set to the median value
     d_blurred[index] = surround[middle]; 
+}
+
+/**
+* Shared Memory Median filter CUDA kernel
+* NOTE: This method is from paper High Performance Median Filtering Algorithm Based on NVIDIA GPU Computing
+*/
+__global__ void median_filter_kernel_shared(unsigned char *inputImageKernel, unsigned char *outputImagekernel, 
+                                            size_t imageHeight, size_t imageWidth)
+{
+	//Set the row and col value for each thread.
+	int row = blockIdx.y * blockDim.y + threadIdx.y;
+	int col = blockIdx.x * blockDim.x + threadIdx.x;
+	__shared__ unsigned char sharedmem[(THREAD_SIZE+2)]  [(THREAD_SIZE+2)];  //initialize shared memory
+
+	//Take some values.
+	bool is_x_left = (threadIdx.x == 0), is_x_right = (threadIdx.x == THREAD_SIZE-1);
+  bool is_y_top = (threadIdx.y == 0), is_y_bottom = (threadIdx.y == THREAD_SIZE-1);
+
+	//Initialize with zero
+	if(is_x_left)
+		sharedmem[threadIdx.x][threadIdx.y+1] = 0;
+	else if(is_x_right)
+		sharedmem[threadIdx.x + 2][threadIdx.y+1]=0;
+	if (is_y_top){
+		sharedmem[threadIdx.x+1][threadIdx.y] = 0;
+		if(is_x_left)
+			sharedmem[threadIdx.x][threadIdx.y] = 0;
+		else if(is_x_right)
+			sharedmem[threadIdx.x+2][threadIdx.y] = 0;
+	}
+	else if (is_y_bottom){
+		sharedmem[threadIdx.x+1][threadIdx.y+2] = 0;
+		if(is_x_right)
+			sharedmem[threadIdx.x+2][threadIdx.y+2] = 0;
+		else if(is_x_left)
+			sharedmem[threadIdx.x][threadIdx.y+2] = 0;
+	}
+
+	//Setup pixel values
+	sharedmem[threadIdx.x+1][threadIdx.y+1] = inputImageKernel[row*imageWidth+col];
+	//Check for boundry conditions.
+	if(is_x_left && (col>0))
+		sharedmem[threadIdx.x][threadIdx.y+1] = inputImageKernel[row*imageWidth+(col-1)];
+	else if(is_x_right && (col<imageWidth-1))
+		sharedmem[threadIdx.x + 2][threadIdx.y+1]= inputImageKernel[row*imageWidth+(col+1)];
+	if (is_y_top && (row>0)){
+		sharedmem[threadIdx.x+1][threadIdx.y] = inputImageKernel[(row-1)*imageWidth+col];
+		if(is_x_left)
+			sharedmem[threadIdx.x][threadIdx.y] = inputImageKernel[(row-1)*imageWidth+(col-1)];
+		else if(is_x_right )
+			sharedmem[threadIdx.x+2][threadIdx.y] = inputImageKernel[(row-1)*imageWidth+(col+1)];
+	}
+	else if (is_y_bottom && (row<imageHeight-1)){
+		sharedmem[threadIdx.x+1][threadIdx.y+2] = inputImageKernel[(row+1)*imageWidth + col];
+		if(is_x_right)
+			sharedmem[threadIdx.x+2][threadIdx.y+2] = inputImageKernel[(row+1)*imageWidth+(col+1)];
+		else if(is_x_left)
+			sharedmem[threadIdx.x][threadIdx.y+2] = inputImageKernel[(row+1)*imageWidth+(col-1)];
+	}
+
+	__syncthreads();   //Wait for all threads to be done.
+
+	//Setup the filter.
+	unsigned char filterVector[9] = {sharedmem[threadIdx.x][threadIdx.y], sharedmem[threadIdx.x+1][threadIdx.y], sharedmem[threadIdx.x+2][threadIdx.y],
+                   sharedmem[threadIdx.x][threadIdx.y+1], sharedmem[threadIdx.x+1][threadIdx.y+1], sharedmem[threadIdx.x+2][threadIdx.y+1],
+                   sharedmem[threadIdx.x] [threadIdx.y+2], sharedmem[threadIdx.x+1][threadIdx.y+2], sharedmem[threadIdx.x+2][threadIdx.y+2]};
+
+	
+	{
+		for (int i = 0; i < 9; i++) {
+        for (int j = i + 1; j < 9; j++) {
+            if (filterVector[i] > filterVector[j]) { 
+				        //Swap Values.
+                char tmp = filterVector[i];
+                filterVector[i] = filterVector[j];
+                filterVector[j] = tmp;
+            }
+        }
+    }
+	outputImagekernel[row*imageWidth+col] = filterVector[4];   //Set the output image values.
+	}
 }
 
 /**
@@ -331,6 +413,58 @@ void median_filter(unsigned char* d_frame,
 }
 
 /**
+* Call to the median filter
+*/
+void median_filter_shared(unsigned char* d_frame,
+                     unsigned char* d_blurred,
+                     size_t numRows, size_t numCols)
+{
+
+  const dim3 blockSize(THREAD_SIZE, THREAD_SIZE, 1);
+  const dim3 gridSize(numRows / THREAD_SIZE + 1, numCols / THREAD_SIZE + 1, 1); 
+  // once in the x direction
+  //default median filter size 3
+  median_filter_kernel_shared<<<gridSize, blockSize>>>(d_frame, d_blurred, numRows, numCols);
+
+  
+  cudaDeviceSynchronize(); checkCudaErrors(cudaGetLastError());
+}
+
+void gaussian_and_median_shared_blur(unsigned char* d_frame,
+                     unsigned char* d_blurred,
+                     unsigned char* d_blurred_temp,
+                     const float* const d_gfilter,
+                     size_t d_filter_size,
+                     size_t numRows, size_t numCols)
+{
+
+  const dim3 blockSize(THREAD_SIZE, THREAD_SIZE, 1);
+  const dim3 gridSize(numRows / THREAD_SIZE + 1, numCols / THREAD_SIZE + 1, 1); 
+
+  #if SEPARATED_GAUSSIAN_FILTER == 1
+  // once in the x direction
+  gaussian_filter_kernel_separable<<<gridSize, blockSize>>>(d_frame, d_blurred, d_gfilter, 
+                                                  d_filter_size, 
+                                                  numRows, numCols, true);
+
+  //once in the y direction
+  gaussian_filter_kernel_separable<<<gridSize, blockSize>>>(d_blurred, d_blurred_temp, d_gfilter, 
+                                                  d_filter_size, 
+                                                  numRows, numCols, false);
+  #else
+  // in this case, also need to make sure the filter is 2d
+  gaussian_filter_kernel<<<gridSize, blockSize>>>(d_frame, d_blurred_temp, d_gfilter, 
+                                                  d_filter_size, d_filter_size, 
+                                                  numRows, numCols);
+  #endif
+
+  //median_filter_kernel<<<gridSize, blockSize>>>(d_blurred_temp, d_blurred, numRows, numCols);
+  median_filter_kernel_shared<<<gridSize, blockSize>>>(d_blurred_temp, d_blurred, numRows, numCols);
+  
+  cudaDeviceSynchronize(); checkCudaErrors(cudaGetLastError());
+}
+
+/**
 * A sequenced call to either the separable gaussian filter or the 2d filter and a subsequent call
 * to the median filter CUDA kernels to run on the GPU with the device memory pointers provided
 */
@@ -362,10 +496,8 @@ void gaussian_and_median_blur(unsigned char* d_frame,
                                                   numRows, numCols);
   #endif
 
+  //median_filter_kernel<<<gridSize, blockSize>>>(d_blurred_temp, d_blurred, numRows, numCols);
   median_filter_kernel<<<gridSize, blockSize>>>(d_blurred_temp, d_blurred, numRows, numCols);
-
   
   cudaDeviceSynchronize(); checkCudaErrors(cudaGetLastError());
 }
-
-
