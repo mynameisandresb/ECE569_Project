@@ -502,7 +502,7 @@ cudaError_t launch_helper(float* Runtimes);
 struct HogProp hp;
 struct DisplayProp dp;
 uchar * CPU_InputArray, * CPU_OutputArray;
-float *CPU_CellArray,*CPU_FeatureArray, *CPU_Hist;
+float *CPU_FeatureArray, *CPU_Hist;
 
 cudaStream_t stream[2];
 
@@ -1113,8 +1113,8 @@ Mat hogFeature(Mat image){
 
   // Setting input parameters adjusted optimized performance set
   hp.CellSize= 8; //atoi(argv[3]); 
-  hp.BlockSize= 8; //atoi(argv[4]); 
-  hp.BlockOverlap= 0; //atoi(argv[5]); 		  
+  hp.BlockSize= 2; //atoi(argv[4]); 
+  hp.BlockOverlap= 1; //atoi(argv[5]); 		  
   hp.NumBins= 9; //atoi(argv[6]); 
   hp.Orientation= 0; //atoi(argv[7]);
 
@@ -1142,11 +1142,11 @@ Mat hogFeature(Mat image){
   hp.FeatureSize=hp.NumBins*hp.BlockSize*hp.BlockSize;
 
   // Comment printf out for project
-  // printf("----------------------------------IMAGE DIVIDED INTO CELL HISTOGRAM----------------\n");
-  // printf("\nCell_rows = %d, Cell_columns = %d, Total_cells = %d\n",hp.CellRow,hp.CellCol,hp.TotalCells);
-	// printf("\nBlock_rows = %d, Block_columns = %d, Total_blocks = %d\n",hp.BlockRow,hp.BlockCol,hp.TotalBlocks);
-  // printf("\nfeaturesize=%d\n",hp.FeatureSize);
-  // printf("-----------------------------------------------------------------------------------\n\n");
+  printf("----------------------------------IMAGE DIVIDED INTO CELL HISTOGRAM----------------\n");
+  printf("\nCell_rows = %d, Cell_columns = %d, Total_cells = %d\n",hp.CellRow,hp.CellCol,hp.TotalCells);
+	printf("\nBlock_rows = %d, Block_columns = %d, Total_blocks = %d\n",hp.BlockRow,hp.BlockCol,hp.TotalBlocks);
+  printf("\nfeaturesize=%d\n",hp.FeatureSize);
+  printf("-----------------------------------------------------------------------------------\n\n");
   
   dp.ImgRow=hp.ImgRow;
   dp.ImgCol=hp.ImgCol;
@@ -1183,14 +1183,6 @@ Mat hogFeature(Mat image){
 
   // Output the HOG features to the SVM classifier 
   Mat hogFeatureOutput = Mat(dp.DisplayImgRow, dp.DisplayImgCol, CV_8UC1, CPU_InputArray);
-
-  if(firstRun){
-    printf("----------------------------------HOG Feature Timings----------------\n");
-	  printf("Tfr CPU->GPU = %5.2f ms ... \nExecution = %5.2f ms ... \nTfr GPU->CPU = %5.2f ms   \n Total=%5.2f ms\n", GPURuntimes[1], GPURuntimes[2], GPURuntimes[3], GPURuntimes[0]);
-    printf("-----------------------------------------------------------------------------------\n\n");
-    writeImageToFile(hogFeatureOutput);
-    firstRun = false;
-  }
 
   cudaFreeHost(CPU_OutputArray);
   cudaFreeHost(CPU_InputArray);
@@ -1251,21 +1243,21 @@ cudaError_t launch_helper(float* Runtimes){
  }
 
  checkCuda(cudaDeviceSynchronize());
- // $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ cudaFree(GPU_idata);
- 
- //-------------------------------------------------------------Display_Cell_kernel-------------------------------------------------------------------------
- checkCuda(cudaMalloc((void**)&TempDisplayhistogram, dp.HorzCellsTotal*4*4));
- checkCuda(cudaMalloc((void**)&Displayhistogram, dp.TotalCells *4*4)); 
+ cudaFree(GPU_idata);
 
- // The original Display_Cell_kernel
- threadsPerBlock = dim3(BOX_SIZE, BOX_SIZE);
- numBlocks = dim3((int)ceil(dp.HorzCells / (float)threadsPerBlock.x), (int)ceil(dp.CellCol / (float)threadsPerBlock.y));
+                                                                                                                                                        //  //-------------------------------------------------------------Display_Cell_kernel-------------------------------------------------------------------------
+                                                                                                                                                        //  checkCuda(cudaMalloc((void**)&TempDisplayhistogram, dp.HorzCellsTotal*4*4));
+                                                                                                                                                        //  checkCuda(cudaMalloc((void**)&Displayhistogram, dp.TotalCells *4*4)); 
 
- if(Display_Cell_kernel_v==1){
-  Display_Cell_kernel_v1<<<numBlocks, threadsPerBlock,0,stream[1]>>>(Displayhistogram,TempDisplayhistogram,DisplayOrientation,Gradient,dp);
- } else {
-  Display_Cell_kernel_v0<<<numBlocks, threadsPerBlock,0,stream[1]>>>(Displayhistogram,TempDisplayhistogram,DisplayOrientation,Gradient,dp);
- }
+                                                                                                                                                        //  // The original Display_Cell_kernel
+                                                                                                                                                        //  threadsPerBlock = dim3(BOX_SIZE, BOX_SIZE);
+                                                                                                                                                        //  numBlocks = dim3((int)ceil(dp.HorzCells / (float)threadsPerBlock.x), (int)ceil(dp.CellCol / (float)threadsPerBlock.y));
+
+                                                                                                                                                        //  if(Display_Cell_kernel_v==1){
+                                                                                                                                                        //   Display_Cell_kernel_v1<<<numBlocks, threadsPerBlock,0,stream[1]>>>(Displayhistogram,TempDisplayhistogram,DisplayOrientation,Gradient,dp);
+                                                                                                                                                        //  } else {
+                                                                                                                                                        //   Display_Cell_kernel_v0<<<numBlocks, threadsPerBlock,0,stream[1]>>>(Displayhistogram,TempDisplayhistogram,DisplayOrientation,Gradient,dp);
+                                                                                                                                                        //  }
  
  //-------------------------------------------------------------Cell_kernel-------------------------------------------------------------------------
  // Cell_kernel
@@ -1302,33 +1294,34 @@ cudaError_t launch_helper(float* Runtimes){
   Cell_kernel_v0<<<numBlocks, threadsPerBlock, 0, stream[0]>>>(GPU_CellHistogram, Orientation, Gradient, hp);
  }
 
- //-------------------------------------------------------------display_kernel-------------------------------------------------------------------------
-  // display_kernel
- checkCuda(cudaDeviceSynchronize());
- checkCuda(cudaMemcpy(CPU_Hist,Displayhistogram , dp.TotalCells *4*4, cudaMemcpyDeviceToHost));
+                                                                                                                                                        //  //-------------------------------------------------------------display_kernel-------------------------------------------------------------------------
+                                                                                                                                                        //   // display_kernel
+                                                                                                                                                        //  checkCuda(cudaDeviceSynchronize());
+                                                                                                                                                        //  checkCuda(cudaMemcpy(CPU_Hist,Displayhistogram , dp.TotalCells *4*4, cudaMemcpyDeviceToHost));
 
-//  $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ cudaFree(TempDisplayhistogram);
-//  $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ cudaFree(Orientation); cudaFree(Gradient);
- checkCuda(cudaMalloc((void**)&GPU_odata, dp.DisplayImgSize));
- cudaMemset(GPU_odata, 0, dp.DisplayImgSize);
- threadsPerBlock = dim3(4, 4, 4);
- numBlocks = dim3((int)ceil(dp.CellRow / (float)threadsPerBlock.x), (int)ceil(dp.CellCol / (float)threadsPerBlock.y));
-//  //printf("\n\n...%d %d...\n\n",numBlocks.x,numBlocks.y); 
+                                                                                                                                                        // //  $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ cudaFree(TempDisplayhistogram);
+                                                                                                                                                        // //  $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ cudaFree(Orientation); cudaFree(Gradient);
+                                                                                                                                                        //  checkCuda(cudaMalloc((void**)&GPU_odata, dp.DisplayImgSize));
+                                                                                                                                                        //  cudaMemset(GPU_odata, 0, dp.DisplayImgSize);
+                                                                                                                                                        //  threadsPerBlock = dim3(4, 4, 4);
+                                                                                                                                                        //  numBlocks = dim3((int)ceil(dp.CellRow / (float)threadsPerBlock.x), (int)ceil(dp.CellCol / (float)threadsPerBlock.y));
+                                                                                                                                                        // //  //printf("\n\n...%d %d...\n\n",numBlocks.x,numBlocks.y); 
 
- if(display_kernel_v==1){
-  display_kernel_v1<<<numBlocks, threadsPerBlock,0,stream[1]>>>(Displayhistogram,GPU_odata,dp);
- } else if(display_kernel_v==2){
-  display_kernel_v2<<<numBlocks, threadsPerBlock,0,stream[1]>>>(Displayhistogram,GPU_odata,dp);
- } else {
-  display_kernel_v0<<<numBlocks, threadsPerBlock,0,stream[1]>>>(Displayhistogram,GPU_odata,dp);
- }
+                                                                                                                                                        //  if(display_kernel_v==1){
+                                                                                                                                                        //   display_kernel_v1<<<numBlocks, threadsPerBlock,0,stream[1]>>>(Displayhistogram,GPU_odata,dp);
+                                                                                                                                                        //  } else if(display_kernel_v==2){
+                                                                                                                                                        //   display_kernel_v2<<<numBlocks, threadsPerBlock,0,stream[1]>>>(Displayhistogram,GPU_odata,dp);
+                                                                                                                                                        //  } else {
+                                                                                                                                                        //   display_kernel_v0<<<numBlocks, threadsPerBlock,0,stream[1]>>>(Displayhistogram,GPU_odata,dp);
+                                                                                                                                                        //  }
 
  //-------------------------------------------------------------Block_kernel-------------------------------------------------------------------------
  // Block_kernel
  checkCuda(cudaMallocHost ((void**)&GPU_BlockHistogram,hp.TotalBlocks*sizeof(float)*hp.FeatureSize));
  threadsPerBlock = dim3(BOX_SIZE, BOX_SIZE);
  numBlocks = dim3((int)ceil(hp.BlockRow / (float)threadsPerBlock.x), (int)ceil(hp.BlockCol / (float)threadsPerBlock.y));
- //printf("\n\n...%d %d...\n\n",numBlocks.x,numBlocks.y); 
+ printf("\n\n...%d %d...\n\n",numBlocks.x,numBlocks.y); 
+ printf("\n\n...%d %d...\n\n",hp.BlockRow,hp.BlockCol); 
 
  if(Block_kernel_v==1){
   Block_kernel_v1<<<numBlocks, threadsPerBlock,0,stream[0]>>>(GPU_BlockHistogram, GPU_CellHistogram, hp);
@@ -1340,44 +1333,42 @@ cudaError_t launch_helper(float* Runtimes){
   Block_kernel_v0<<<numBlocks, threadsPerBlock,0,stream[0]>>>(GPU_BlockHistogram, GPU_CellHistogram, hp);
  }
 
-//  //-------------------------------------------------------------Timings-------------------------------------------------------------------------
+ //-------------------------------------------------------------Timings-------------------------------------------------------------------------
  cudaEventRecord(time3, 0);
  
- checkCuda(cudaMemcpyAsync(CPU_OutputArray, GPU_odata, dp.DisplayImgSize, cudaMemcpyDeviceToHost,stream[1]));
+//  checkCuda(cudaMemcpyAsync(CPU_OutputArray, GPU_odata, dp.DisplayImgSize, cudaMemcpyDeviceToHost,stream[1]));
  checkCuda(cudaDeviceSynchronize());
- 
-//  //checkCuda(cudaMemcpy(CPU_CellArray,GPU_CellHistogram , hp.TotalCells*sizeof(float)*hp.NumBins, cudaMemcpyDeviceToHost));
 
  checkCuda(cudaMemcpy(CPU_FeatureArray,GPU_BlockHistogram , hp.TotalBlocks*sizeof(float)*hp.FeatureSize, cudaMemcpyDeviceToHost));
- 
- 	cudaEventRecord(time4, 0);
-	cudaEventSynchronize(time1);
-	cudaEventSynchronize(time2);
-	cudaEventSynchronize(time3);
-	cudaEventSynchronize(time4);
 
-	float totalTime, tfrCPUtoGPU, tfrGPUtoCPU, kernelExecutionTime;
+//  	cudaEventRecord(time4, 0);
+// 	cudaEventSynchronize(time1);
+// 	cudaEventSynchronize(time2);
+// 	cudaEventSynchronize(time3);
+// 	cudaEventSynchronize(time4);
 
-	cudaEventElapsedTime(&totalTime, time1, time4);
-	cudaEventElapsedTime(&tfrCPUtoGPU, time1, time2);
-	cudaEventElapsedTime(&kernelExecutionTime, time2, time3);
-	cudaEventElapsedTime(&tfrGPUtoCPU, time3, time4);
+// 	float totalTime, tfrCPUtoGPU, tfrGPUtoCPU, kernelExecutionTime;
 
-	Runtimes[0] = totalTime;
-	Runtimes[1] = tfrCPUtoGPU;
-	Runtimes[2] = kernelExecutionTime;
-	Runtimes[3] = tfrGPUtoCPU;
+// 	cudaEventElapsedTime(&totalTime, time1, time4);
+// 	cudaEventElapsedTime(&tfrCPUtoGPU, time1, time2);
+// 	cudaEventElapsedTime(&kernelExecutionTime, time2, time3);
+// 	cudaEventElapsedTime(&tfrGPUtoCPU, time3, time4);
+
+// 	Runtimes[0] = totalTime;
+// 	Runtimes[1] = tfrCPUtoGPU;
+// 	Runtimes[2] = kernelExecutionTime;
+// 	Runtimes[3] = tfrGPUtoCPU;
 
  	Error:
   for(i=0;i<2;i++) cudaStreamDestroy(stream[i]);
-	cudaFree(GPU_odata);
-	cudaFree(GPU_idata);
+// 	cudaFree(GPU_odata);
+// 	cudaFree(GPU_idata);
   cudaFree(Orientation);
   cudaFree(Gradient);
   cudaFree(DisplayOrientation);
   // cudaFree(GPU_BlockHistogram);
-	cudaFree(Displayhistogram);
-  cudaFree(TempDisplayhistogram);
+// 	cudaFree(Displayhistogram);
+//   cudaFree(TempDisplayhistogram);
  	cudaEventDestroy(time1);
 	cudaEventDestroy(time2);
 	cudaEventDestroy(time3);

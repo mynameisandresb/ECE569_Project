@@ -250,8 +250,8 @@ void test_cuda()
   /*
    * create window to display results
    */
-  cv::namedWindow("origin", CV_WINDOW_AUTOSIZE);
-  cv::namedWindow("result", CV_WINDOW_AUTOSIZE);
+  //cv::namedWindow("origin", CV_WINDOW_AUTOSIZE);
+  //cv::namedWindow("result", CV_WINDOW_AUTOSIZE);
 
   /*
    * Absolute background
@@ -492,35 +492,22 @@ void test_cuda()
     // Show the window video of the original images
     putTextOverlay(dst, i, hogSVMClassification); // Add classification text overlay
     
-    cvWaitKey(1);
+    //cvWaitKey(1);
 
     // Show the window video of the modified images
     cv::Mat temp = cv::Mat(numRows(), numCols(), CV_8UC1, binary);
-    cv::imshow("origin", temp);
+    //cv::imshow("origin", temp);
     std::vector<cv::Mat> bounding_boxes = getBoundingBoxes(temp);
-    
-    for( int i = 0; i < bounding_boxes.size(); i++ )
-    {
-      cv::Mat hogFeatureOutput = hogFeature(temp);
-      
-      cv::imshow("origin", hogFeatureOutput);
-
+    std::vector<cv::Mat> hogFeatureOutputs(bounding_boxes.size());
+    for(int w = 0; w < bounding_boxes.size(); w++){
+      hogFeatureOutputs[w] = hogFeature(bounding_boxes[w]);
+      sprintf(buff2, "../../video_converter/out/out_%d_%06d.jpg", w, i);
+      cv::imwrite(buff2, hogFeatureOutputs[w]);
     }
-    // printf("%d \n", bounding_boxes.size() );
-    if (bounding_boxes.size() >= 1)
-    {
-
-      // printf("%d %d\n", bounding_boxes[0].rows, bounding_boxes[0].cols );
-      // cv::Mat hogFeatureOutput = hogFeature(bounding_boxes[0]);
-
-      cv::imshow("result", bounding_boxes[0]);
-    }
-
+  
     // putTextOverlay(bounding_boxes, i, hogSVMClassification); // Add classification text overlay
-    // sprintf(buff2, "../../video_converter/out/out%06d.jpg", i);
-    // cv::imwrite(buff2, bounding_boxes);
     // cv::imshow("result", temp);
-    cvWaitKey(1);
+    //cvWaitKey(1);
 
     // free up memory on the device
     cleanup();
@@ -536,8 +523,8 @@ void test_cuda()
   cudaFree(d_gaussian_filter);
 
   // END LOOP and destroy the window
-  cvDestroyWindow("origin");
-  cvDestroyWindow("result");
+  //cvDestroyWindow("origin");
+  //cvDestroyWindow("result");
   t_total_f = cpu_timer();
   t_total = t_total_f - t_total_s;
   t_serial = t_total - t_parallel;
