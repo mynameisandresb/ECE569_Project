@@ -4,9 +4,10 @@
 #include <string>
 #include <stdio.h>
 #include "compare.h"
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
 #include <opencv2/opencv.hpp>
+#include <opencv2/core/core.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/highgui/highgui.hpp>
 #include <sys/time.h>
 #include "filter.h"
 
@@ -146,6 +147,52 @@ cv::Mat readImage(const std::string &filename){
     return frame;
 }
 
+
+// BOUNDING BOX CODE GOTTEN FROM https://stackoverflow.com/questions/14733042/opencv-bounding-box
+cv::Mat getBoundingBoxes(cv::Mat & matImage){
+
+  // opencv filters needed for bounding boxes
+  cv::Mat dilate;
+  cv::Mat element(7,7, CV_8U, cv::Scalar(1));
+  cv::dilate(matImage, dilate, element, cv::Point(-1,-1),2);
+  cv::Mat erode;
+  cv::Mat element2(7,7, CV_8U, cv::Scalar(1));
+  cv::erode(dilate, erode, element2, cv::Point(-1,-1),4 );
+  cv::Mat dilate2;
+  cv::Mat element3(7,7, CV_8U, cv::Scalar(1));
+  cv::dilate(erode, dilate2, element3, cv::Point(-1,-1),2); 
+
+  std::vector<std::vector<cv::Point>> contours;
+  std::vector<cv::Vec4i> hierarchy;
+  std::vector<cv::Vec3f> vecCircles;               
+  std::vector<cv::Vec3f>::iterator itrCircles;
+  cv::findContours(dilate2, contours, hierarchy, CV_RETR_EXTERNAL,  CV_CHAIN_APPROX_SIMPLE, cv::Point(0, 0) );
+
+  /// Approximate contours to polygons + get bounding rects and circles
+  std::vector<std::vector<cv::Point>> contours_poly( contours.size() );
+  std::vector<cv::Rect> boundRect( contours.size() );
+  std::vector<cv::Point2f> center( contours.size() );
+  std::vector<float> radius( contours.size() );
+
+  for( int i = 0; i < contours.size(); i++ )
+  { 
+      cv::approxPolyDP( cv::Mat(contours[i]), contours_poly[i], 3, true );
+      boundRect[i] = cv::boundingRect( cv::Mat(contours_poly[i]) );
+      
+  }
+
+  /// Draw polygonal contour + bonding rects
+  //cv::Mat matImage = cv::Mat::zeros( dilate2.size(), CV_8UC3 );
+  for( int i = 0; i < contours.size(); i++ )
+  {
+      cv::Scalar color = cv::Scalar(255,0,255);
+      cv::drawContours( matImage, contours_poly, i, color, 1, 8, std::vector<cv::Vec4i>(), 0, cv::Point() );
+      cv::rectangle( matImage, boundRect[i].tl(), boundRect[i].br(), color, 2, 8, 0 );          
+  }
+
+  return matImage;
+}
+
 void test_cuda(){
   /*
   * Timing variables
@@ -158,8 +205,8 @@ void test_cuda(){
   /*
   * create window to display results
   */
-  cv::namedWindow("origin", CV_WINDOW_AUTOSIZE);
-  cv::namedWindow("result", CV_WINDOW_AUTOSIZE);
+  //cv::namedWindow("origin", CV_WINDOW_AUTOSIZE);
+  //cv::namedWindow("result", CV_WINDOW_AUTOSIZE);
 
   /*
   * Absolute background
@@ -194,9 +241,10 @@ void test_cuda(){
 
 
   char buff[100];
+  char buff2[100];
 
   int i = 2;
-  std::string input_file = "/home/u30/andresbarragan/ece569/MotionDetection/Videos/logos/input/in000001.jpg";
+  std::string input_file = "/home/andres/ECE569_Project/video_converter/data/in000001.jpg";
 
   frame = readImage(input_file);
   if(!frame.isContinuous()){
@@ -390,20 +438,23 @@ void test_cuda(){
     //-------------------------------------------------------------Display Results Video-------------------------------------------------------------------------
     // Show the window video of the original images
     putTextOverlay(dst, i, hogSVMClassification); // Add classification text overlay
-    cv::imshow("origin", dst);
+    //cv::imshow("origin", dst);
     cvWaitKey(1);
 
     // Show the window video of the modified images
     cv::Mat temp = cv::Mat(numRows(), numCols(), CV_8UC1, binary);
-    putTextOverlay(temp, i, hogSVMClassification); // Add classification text overlay
-    cv::imshow("result", temp);
+    cv::Mat bounding_boxes = getBoundingBoxes(temp);
+    putTextOverlay(bounding_boxes, i, hogSVMClassification); // Add classification text overlay
+    sprintf(buff2, "/home/andres/ECE569_Project/video_converter/out/out%06d.jpg", i);
+    cv::imwrite(buff2, bounding_boxes);
+    //cv::imshow("result", temp);
     cvWaitKey(1);
 
     //free up memory on the device
     cleanup();
 
     //get the next frame
-    sprintf(buff, "/home/u30/andresbarragan/ece569/MotionDetection/Videos/logos/input/in%06d.jpg", i++);
+    sprintf(buff, "/home/andres/ECE569_Project/video_converter/data/in%06d.jpg", i++);
     std::string buffAsStdStr = buff;
     const char * c = buffAsStdStr.c_str();
     frame = readImage(c);
@@ -413,8 +464,8 @@ void test_cuda(){
   cudaFree(d_gaussian_filter);
 
   //END LOOP and destroy the window
-  cvDestroyWindow("origin");
-  cvDestroyWindow("result");
+  //cvDestroyWindow("origin");
+  //cvDestroyWindow("result");
   t_total_f = cpu_timer();
   t_total = t_total_f-t_total_s;
   t_serial = t_total-t_parallel;
