@@ -67,7 +67,7 @@ void test_cuda();
 /*
 HOG-Feature
 */
-cv::Mat hogFeature(cv::Mat image);
+cv::Mat hogFeature(cv::Mat image, std::string filename);
 
 /*
 Classification GUI Text Overlay
@@ -500,9 +500,11 @@ void test_cuda()
     std::vector<cv::Mat> bounding_boxes = getBoundingBoxes(temp);
     std::vector<cv::Mat> hogFeatureOutputs(bounding_boxes.size());
     for(int w = 0; w < bounding_boxes.size(); w++){
-      hogFeatureOutputs[w] = hogFeature(bounding_boxes[w]);
+      sprintf(buff2, "../../video_converter/out/out_%d_%06d.yml", w, i);
+      std::string filename = buff2;
+      hogFeatureOutputs[w] = hogFeature(bounding_boxes[w], filename);
       sprintf(buff2, "../../video_converter/out/out_%d_%06d.jpg", w, i);
-      cv::imwrite(buff2, hogFeatureOutputs[w]);
+      cv::imwrite(buff2, bounding_boxes[w]);
     }
   
     // putTextOverlay(bounding_boxes, i, hogSVMClassification); // Add classification text overlay
