@@ -706,11 +706,11 @@ Mat hogFeature(Mat image, std::string filename){
   hp.FeatureSize=hp.NumBins*hp.BlockSize*hp.BlockSize;
 
   // Comment printf out for project
-  printf("----------------------------------IMAGE DIVIDED INTO CELL HISTOGRAM----------------\n");
-  printf("\nCell_rows = %d, Cell_columns = %d, Total_cells = %d\n",hp.CellRow,hp.CellCol,hp.TotalCells);
-	printf("\nBlock_rows = %d, Block_columns = %d, Total_blocks = %d\n",hp.BlockRow,hp.BlockCol,hp.TotalBlocks);
-  printf("\nfeaturesize=%d\n",hp.FeatureSize);
-  printf("-----------------------------------------------------------------------------------\n\n");
+  //print("----------------------------------IMAGE DIVIDED INTO CELL HISTOGRAM----------------\n");
+  //print("\nCell_rows = %d, Cell_columns = %d, Total_cells = %d\n",hp.CellRow,hp.CellCol,hp.TotalCells);
+	//print("\nBlock_rows = %d, Block_columns = %d, Total_blocks = %d\n",hp.BlockRow,hp.BlockCol,hp.TotalBlocks);
+  //print("\nfeaturesize=%d\n",hp.FeatureSize);
+  //print("-----------------------------------------------------------------------------------\n\n");
   
   dp.ImgRow=hp.ImgRow;
   dp.ImgCol=hp.ImgCol;
@@ -747,10 +747,11 @@ Mat hogFeature(Mat image, std::string filename){
   //checkCudaErrors(launch_helper(GPURuntimes, CPU_FeatureArray, CPU_Hist, CPU_InputArray, CPU_OutputArray, dp, hp));
 
   // Output the HOG features to the SVM classifier 
-  Mat hogFeatureOutput = Mat(hp.TotalBlocks, hp.FeatureSize , CV_8UC1, CPU_FeatureArray);
-  cv::FileStorage fs(filename, cv::FileStorage::WRITE);
-  fs<< "data" << hogFeatureOutput;
-  fs.release();
+  //Mat mat1d = train_samples[i].reshape(0, 1);
+  Mat hogFeatureOutput = Mat(hp.TotalBlocks, hp.FeatureSize , CV_32F, CPU_FeatureArray).reshape(0, 1);
+  // cv::FileStorage fs(filename, cv::FileStorage::WRITE);
+  // fs<< "data" << hogFeatureOutput;
+  // fs.release();
   //cudaFreeHost(CPU_OutputArray);
   cudaFreeHost(CPU_InputArray);
   //cudaFreeHost(CPU_Hist);	
@@ -888,8 +889,8 @@ cudaError_t launch_helper(float* Runtimes, float *CPU_FeatureArray, uchar *CPU_I
  checkCudaErrors(cudaMallocHost ((void**)&GPU_BlockHistogram,hp.TotalBlocks*sizeof(float)*hp.FeatureSize));
  threadsPerBlock = dim3(BOX_SIZE, BOX_SIZE);
  numBlocks = dim3((int)ceil(hp.BlockRow / (float)threadsPerBlock.x), (int)ceil(hp.BlockCol / (float)threadsPerBlock.y));
- printf("\n\n...%d %d...\n\n",numBlocks.x,numBlocks.y); 
- printf("\n\n...%d %d...\n\n",hp.BlockRow,hp.BlockCol); 
+ //print("\n\n...%d %d...\n\n",numBlocks.x,numBlocks.y); 
+ //print("\n\n...%d %d...\n\n",hp.BlockRow,hp.BlockCol); 
 
  if(Block_kernel_v==1){
   Block_kernel_v1<<<numBlocks, threadsPerBlock,0,stream[0]>>>(GPU_BlockHistogram, GPU_CellHistogram, hp);

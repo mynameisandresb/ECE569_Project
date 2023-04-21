@@ -153,8 +153,14 @@ cv::Mat readImage(const std::string &filename)
   return frame;
 }
 
+struct BoundingBox
+{
+	cv::Mat image;
+  cv::Rect rect;
+};
+
 // BOUNDING BOX CODE GOTTEN FROM https://stackoverflow.com/questions/14733042/opencv-bounding-box
-std::vector<cv::Mat> getBoundingBoxes(cv::Mat &matImage)
+std::vector<BoundingBox> getBoundingBoxes(cv::Mat &matImage)
 {
 
   // opencv filters needed for bounding boxes
@@ -180,6 +186,9 @@ std::vector<cv::Mat> getBoundingBoxes(cv::Mat &matImage)
   std::vector<cv::Point2f> center(contours.size());
   std::vector<float> radius(contours.size());
 
+  // Custom struct
+  std::vector<struct BoundingBox> bounding_boxes;
+
   for (int i = 0; i < contours.size(); i++)
   {
     cv::approxPolyDP(cv::Mat(contours[i]), contours_poly[i], 3, true);
@@ -188,7 +197,6 @@ std::vector<cv::Mat> getBoundingBoxes(cv::Mat &matImage)
 
   int imageWidth = matImage.size().width;
   int imageHeight = matImage.size().height;
-  int count = 0;
   /// Draw polygonal contour + bonding rects
   // cv::Mat matImage = cv::Mat::zeros( dilate2.size(), CV_8UC3 );
   std::vector<cv::Mat> vec_as; //(contours.size());
@@ -206,7 +214,7 @@ std::vector<cv::Mat> getBoundingBoxes(cv::Mat &matImage)
     int x_comp = 80; 
     int y_comp = 72; 
 
-    if (b_wd < imageWidth)
+    if (b_wd < imageWidth && b_wd > 20)
     {
       if (x_pos + x_comp < imageWidth)// && x_pos - x_comp > 0)
       {
@@ -215,26 +223,22 @@ std::vector<cv::Mat> getBoundingBoxes(cv::Mat &matImage)
           boundRect[i].width = x_comp;
           boundRect[i].height = y_comp;
 
-          printf("%d %d %d %d %d\n", i, boundRect[i].x, boundRect[i].y, boundRect[i].width, boundRect[i].height);
+          //printf("%d %d %d %d %d\n", i, boundRect[i].x, boundRect[i].y, boundRect[i].width, boundRect[i].height);
           // printf("%d %d\n", matImage.row, matImage.col );
           cv::Mat a;
           matImage(boundRect[i]).copyTo(a);
           //vec_as[i] = a;
-          vec_as.push_back(a);
-          count++;
+          struct BoundingBox bounding_box;
+          bounding_box.image = a;
+          bounding_box.rect = boundRect[i];
+          bounding_boxes.push_back(bounding_box);
+
         }
       }
     }
-    // inputImg(roi).copyTo(extractedContent);
   }
-  /*
-  std::vector<cv::Mat> vec_dd(count);
-  for (int i = 0; i < count; i++)
-  {
-    vec_dd[i] = vec_as[i];
-  }*/
 
-  return vec_as;
+  return bounding_boxes;
 }
 
 void test_cuda()
@@ -379,7 +383,7 @@ void test_cuda()
 
   // Initialize a GPU timer based on events
   GpuTimer timer;
-
+  cv::Ptr<cv::ml::SVM> svm = cv::ml::SVM::load("/home/andres/ECE569_Project/HOG-Feature/svm.yml");
   while (i < 500)
   {
 
@@ -494,20 +498,60 @@ void test_cuda()
     
     //cvWaitKey(1);
 
+    // Load image color
+    sprintf(buff2, "../../video_converter/data/in%06d.jpg", i);
+    cv::Mat frame_color = cv::imread(buff2);
+
+  
     // Show the window video of the modified images
     cv::Mat temp = cv::Mat(numRows(), numCols(), CV_8UC1, binary);
     //cv::imshow("origin", temp);
-    std::vector<cv::Mat> bounding_boxes = getBoundingBoxes(temp);
+    //cv::Mat test = cv::Mat::zeros(1, 72 * 36, CV_32F);
+    std::vector<struct BoundingBox> bounding_boxes = getBoundingBoxes(temp);
     std::vector<cv::Mat> hogFeatureOutputs(bounding_boxes.size());
     for(int w = 0; w < bounding_boxes.size(); w++){
-      sprintf(buff2, "../../video_converter/out/out_%d_%06d.yml", w, i);
+      int type = 0;
+      if(bounding_boxes.size() == 2 && w == 0){
+        type = 1;
+      }
+      if(bounding_boxes.size() == 2 && w == 1){
+        type = 0;
+      }
+      if(bounding_boxes.size() == 1){
+        type = 0;
+      }
+      sprintf(buff2, "../../video_converter/out/out_%d_%06d.yml", type, i);
       std::string filename = buff2;
-      hogFeatureOutputs[w] = hogFeature(bounding_boxes[w], filename);
-      sprintf(buff2, "../../video_converter/out/out_%d_%06d.jpg", w, i);
-      cv::imwrite(buff2, bounding_boxes[w]);
+      hogFeatureOutputs[w] = hogFeature(bounding_boxes[w].image, filename);
+      // sprintf(buff2, "../../video_converter/out/out_%d_%06d.jpg", type, i);
+      // cv::imwrite(buff2, bounding_boxes[w].image);
+      int prediction_int = 0;
+      float prediction = svm->predict(hogFeatureOutputs[w]);
+      if(type > 0.5){
+        prediction_int = 0;
+        cv::putText(frame_color, //target image
+                    "ASU", //text
+                    cv::Point(bounding_boxes[w].rect.x, bounding_boxes[w].rect.y),
+                    cv::FONT_HERSHEY_DUPLEX,
+                    1.0,
+                    CV_RGB(118, 185, 0),
+                    2);
+      }else{
+        prediction_int = 1;
+        cv::putText(frame_color, //target image
+                    "UOFA", //text
+                    cv::Point(bounding_boxes[w].rect.x, bounding_boxes[w].rect.y),
+                    cv::FONT_HERSHEY_DUPLEX,
+                    1.0,
+                    CV_RGB(118, 185, 0),
+                    2);
+      }
+      
+      // sprintf(buff2, "../../video_converter/out/out_%d_%06d.jpg", prediction_int, i);
+      // cv::imwrite(buff2, bounding_boxes[w].image);
     }
-  
-    // putTextOverlay(bounding_boxes, i, hogSVMClassification); // Add classification text overlay
+    sprintf(buff2, "../../video_converter/out/out_%06d.jpg", i);
+    cv::imwrite(buff2, frame_color);
     // cv::imshow("result", temp);
     //cvWaitKey(1);
 
