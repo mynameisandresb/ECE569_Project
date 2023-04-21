@@ -262,8 +262,9 @@ int main( int argc, char** argv )
     vector< int > labels;
 
     clog << "Positive images are being loaded..." ;
-    load_images( pos_dir, pos_lst, visualization );
+    load_images( pos_dir, pos_lst, false );
 
+    //size of input data
     Size pos_image_size = pos_lst[0].size();
   
     labels.assign( pos_lst.size(), +1 );
@@ -274,10 +275,15 @@ int main( int argc, char** argv )
     //Directory of images 
     load_images( neg_dir, full_neg_lst, false );
     clog << "Negative images are  loaded...";
+
+
+    //Reformats Negatives to align with positive 
     sample_neg( full_neg_lst, neg_lst, pos_image_size );
 
     clog << "...[done]" << endl;
 
+
+    //Add label to ngatives
     labels.insert( labels.end(), neg_lst.size(), -1 );
     clog << "labels.insert.. Check..";
     CV_Assert( old < labels.size() );
@@ -326,15 +332,7 @@ int main( int argc, char** argv )
                 resize( detection, detection, pos_image_size );
                 neg_lst.push_back( detection );
             }
-            if ( visualization )
-            {
-                for ( size_t j = 0; j < detections.size(); j++ )
-                {
-                    rectangle( full_neg_lst[i], detections[j], Scalar( 0, 255, 0 ), 2 );
-                }
-                imshow( "testing trained detector on negative images", full_neg_lst[i] );
-                waitKey( 5 );
-            }
+            
         }
         clog << "...[done]" << endl;
 
