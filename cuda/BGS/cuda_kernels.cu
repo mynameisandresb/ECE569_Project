@@ -458,7 +458,6 @@ void gaussian_and_median_shared_blur(unsigned char* d_frame,
                                                   numRows, numCols);
   #endif
 
-  //median_filter_kernel<<<gridSize, blockSize>>>(d_blurred_temp, d_blurred, numRows, numCols);
   median_filter_kernel_shared<<<gridSize, blockSize>>>(d_blurred_temp, d_blurred, numRows, numCols);
   
   cudaDeviceSynchronize(); checkCudaErrors(cudaGetLastError());
@@ -496,7 +495,6 @@ void gaussian_and_median_blur(unsigned char* d_frame,
                                                   numRows, numCols);
   #endif
 
-  //median_filter_kernel<<<gridSize, blockSize>>>(d_blurred_temp, d_blurred, numRows, numCols);
   median_filter_kernel<<<gridSize, blockSize>>>(d_blurred_temp, d_blurred, numRows, numCols);
   
   cudaDeviceSynchronize(); checkCudaErrors(cudaGetLastError());
