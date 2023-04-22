@@ -685,7 +685,7 @@ Mat hogFeature(Mat image, std::string filename){
   // Using optimized kernels versions for performance set
   Cal_kernel_v = 1; //atoi(argv[3]); 0 or 1 
   Cell_kernel_v = 0; //atoi(argv[4]);
-  Block_kernel_v = 0; //atoi(argv[5]);
+  Block_kernel_v = 3; //atoi(argv[5]);
   //Display_Cell_kernel_v = 0; //atoi(argv[6]);
   //display_kernel_v = 0; //atoi(argv[7]);
 
@@ -719,13 +719,13 @@ Mat hogFeature(Mat image, std::string filename){
   checkCudaErrors(launch_helper(GPURuntimes, CPU_FeatureArray, CPU_InputArray, dp, hp));
 
 
-  printf("-----------------------------------------------------------------\n");
-  printf("Cal= %d ... Cell= %d ... Block= %d \n",Cal_kernel_v, Cell_kernel_v, Block_kernel_v);
-  printf("Tfr CPU->GPU = %5.2f ms...Execution = %5.2f ms...Tfr GPU->CPU = %5.2f ms...Total=%5.2f ms\n",
-          GPURuntimes[1], GPURuntimes[2], GPURuntimes[3], GPURuntimes[0]);
-  printf("Avg-Cal=%5.4f ms...Avg-Cell=%5.4f ms...Avg-Block=%5.4f ms",
-                      GPURuntimes[4], GPURuntimes[5],GPURuntimes[6]);
-  printf("-----------------------------------------------------------------\n");
+  // printf("-----------------------------------------------------------------\n");
+  // printf("Cal= %d ... Cell= %d ... Block= %d \n",Cal_kernel_v, Cell_kernel_v, Block_kernel_v);
+  // printf("Tfr CPU->GPU = %5.2f ms...Execution = %5.2f ms...Tfr GPU->CPU = %5.2f ms...Total=%5.2f ms\n",
+  //         GPURuntimes[1], GPURuntimes[2], GPURuntimes[3], GPURuntimes[0]);
+  // printf("Avg-Cal=%5.4f ms...Avg-Cell=%5.4f ms...Avg-Block=%5.4f ms",
+  //                     GPURuntimes[4], GPURuntimes[5],GPURuntimes[6]);
+  // printf("-----------------------------------------------------------------\n");
 
   //checkCudaErrors(launch_helper(GPURuntimes, CPU_FeatureArray, CPU_Hist, CPU_InputArray, CPU_OutputArray, dp, hp));
 
