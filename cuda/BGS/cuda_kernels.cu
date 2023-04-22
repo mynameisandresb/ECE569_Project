@@ -211,6 +211,52 @@ void median_filter_kernel(unsigned char* d_frame,
     d_blurred[index] = surround[middle]; 
 }
 
+__global__ void tiled_median_filter(unsigned char* d_frame,
+                                    unsigned char* d_blurred,
+                                    size_t numRows, size_t numCols) {
+  // Creates the variables for shared memory and easy of access
+  __shared__ float tile[THREAD_SIZE][THREAD_SIZE];
+  int bx = blockIdx.x;  int by = blockIdx.y;
+  int tx = threadIdx.x; int ty = threadIdx.y;
+
+  // Finds the row and col that this thread is working on
+  int row = by * THREAD_SIZE + ty;
+  int col = bx * THREAD_SIZE + tx;
+  float pValue = 0;
+
+  // Loop over the A and B tiles required to compute the P element
+  for (int p = 0; p < (numCols-1)/THREAD_SIZE+1; ++p){
+
+    // Collaborative loading of A into shared memory
+    if(row < numRows && p * THREAD_SIZE+tx < numCols){
+      tile[ty][tx] = d_frame[row*numCols + p*THREAD_SIZE+tx];
+    } else {
+      tile[ty][tx] = 0.0;
+    }
+
+    // Allowing loading into shared memory to sync
+    __syncthreads();
+  }
+
+	//Setup the filter.
+	unsigned char filterVector[9] = {tile[threadIdx.x][threadIdx.y], tile[threadIdx.x+1][threadIdx.y], tile[threadIdx.x+2][threadIdx.y],
+                   tile[threadIdx.x][threadIdx.y+1], tile[threadIdx.x+1][threadIdx.y+1], tile[threadIdx.x+2][threadIdx.y+1],
+                   tile[threadIdx.x] [threadIdx.y+2], tile[threadIdx.x+1][threadIdx.y+2], tile[threadIdx.x+2][threadIdx.y+2]};
+
+  for (int i = 0; i < 9; i++) {
+      for (int j = i + 1; j < 9; j++) {
+          if (filterVector[i] > filterVector[j]) { 
+              //Swap Values.
+              char tmp = filterVector[i];
+              filterVector[i] = filterVector[j];
+              filterVector[j] = tmp;
+          }
+      }
+  }
+
+  d_blurred[row*numCols+col] = filterVector[4];   //Set the output image values.
+}
+
 /**
 * Shared Memory Median filter CUDA kernel
 * NOTE: This method is from paper High Performance Median Filtering Algorithm Based on NVIDIA GPU Computing
