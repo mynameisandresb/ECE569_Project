@@ -160,7 +160,7 @@ struct BoundingBox
 };
 
 // BOUNDING BOX CODE GOTTEN FROM https://stackoverflow.com/questions/14733042/opencv-bounding-box
-std::vector<BoundingBox> getBoundingBoxes(cv::Mat &matImage)
+std::vector<BoundingBox> getBoundingBoxes(cv::Mat &matImage, cv::Mat &colorImage)
 {
 
   // opencv filters needed for bounding boxes
@@ -207,14 +207,12 @@ std::vector<BoundingBox> getBoundingBoxes(cv::Mat &matImage)
     int b_ht = boundRect[i].height;
     int b_wd = boundRect[i].width;
 
-    //cv::Scalar color = cv::Scalar(255, 0, 255);
-    //cv::drawContours(matImage, contours_poly, i, color, 1, 8, std::vector<cv::Vec4i>(), 0, cv::Point());
-    //cv::rectangle(matImage, boundRect[i].tl(), boundRect[i].br(), color, 2, 8, 0);
+    cv::Scalar color = cv::Scalar(255, 0, 255);
 
     int x_comp = 80; 
     int y_comp = 72; 
 
-    if (b_wd < imageWidth && b_wd > 20)
+    if (b_wd < imageWidth && b_wd > 60)
     {
       if (x_pos + x_comp < imageWidth)// && x_pos - x_comp > 0)
       {
@@ -222,7 +220,8 @@ std::vector<BoundingBox> getBoundingBoxes(cv::Mat &matImage)
         {
           boundRect[i].width = x_comp;
           boundRect[i].height = y_comp;
-
+          cv::drawContours(colorImage, contours_poly, i, color, 1, 8, std::vector<cv::Vec4i>(), 0, cv::Point());
+          cv::rectangle(colorImage, boundRect[i].tl(), boundRect[i].br(), color, 2, 8, 0);
           //printf("%d %d %d %d %d\n", i, boundRect[i].x, boundRect[i].y, boundRect[i].width, boundRect[i].height);
           // printf("%d %d\n", matImage.row, matImage.col );
           cv::Mat a;
@@ -507,7 +506,7 @@ void test_cuda()
     cv::Mat temp = cv::Mat(numRows(), numCols(), CV_8UC1, binary);
     //cv::imshow("origin", temp);
     //cv::Mat test = cv::Mat::zeros(1, 72 * 36, CV_32F);
-    std::vector<struct BoundingBox> bounding_boxes = getBoundingBoxes(temp);
+    std::vector<struct BoundingBox> bounding_boxes = getBoundingBoxes(temp, frame_color);
     std::vector<cv::Mat> hogFeatureOutputs(bounding_boxes.size());
     for(int w = 0; w < bounding_boxes.size(); w++){
       int type = 0;
