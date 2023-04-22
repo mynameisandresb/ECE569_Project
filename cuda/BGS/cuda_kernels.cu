@@ -215,14 +215,13 @@ __global__ void tiled_median_filter(unsigned char* d_frame,
                                     unsigned char* d_blurred,
                                     size_t numRows, size_t numCols) {
   // Creates the variables for shared memory and easy of access
-  __shared__ float tile[THREAD_SIZE][THREAD_SIZE];
+  __shared__ unsigned char tile[THREAD_SIZE][THREAD_SIZE];
   int bx = blockIdx.x;  int by = blockIdx.y;
   int tx = threadIdx.x; int ty = threadIdx.y;
 
   // Finds the row and col that this thread is working on
-  int row = by * THREAD_SIZE + ty;
-  int col = bx * THREAD_SIZE + tx;
-  float pValue = 0;
+  int col = by * blockDim.y + ty;
+  int row = bx * blockDim.x + tx;
 
   // Loop over the A and B tiles required to compute the P element
   for (int p = 0; p < (numCols-1)/THREAD_SIZE+1; ++p){
@@ -231,7 +230,7 @@ __global__ void tiled_median_filter(unsigned char* d_frame,
     if(row < numRows && p * THREAD_SIZE+tx < numCols){
       tile[ty][tx] = d_frame[row*numCols + p*THREAD_SIZE+tx];
     } else {
-      tile[ty][tx] = 0.0;
+      tile[ty][tx] = 0;
     }
 
     // Allowing loading into shared memory to sync
@@ -508,7 +507,8 @@ void gaussian_and_median_shared_blur(unsigned char* d_frame,
   #endif
 
   median_filter_kernel_shared<<<gridSize, blockSize>>>(d_blurred_temp, d_blurred, numRows, numCols);
-  
+  //tiled_median_filter<<<gridSize, blockSize>>>(d_blurred_temp, d_blurred, numRows, numCols);
+
   cudaDeviceSynchronize(); checkCudaErrors(cudaGetLastError());
 }
 

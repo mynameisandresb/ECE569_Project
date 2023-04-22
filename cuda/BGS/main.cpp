@@ -133,8 +133,8 @@ void test_cuda(){
   /*
   * create window to display results
   */
-  cv::namedWindow("origin", CV_WINDOW_AUTOSIZE);
-  cv::namedWindow("result", CV_WINDOW_AUTOSIZE);
+  // cv::namedWindow("origin", CV_WINDOW_AUTOSIZE);
+  // cv::namedWindow("result", CV_WINDOW_AUTOSIZE);
 
   /*
   * Absolute background
@@ -278,18 +278,23 @@ void test_cuda(){
 
         preprocessGaussianBlur(&frame, &d_frame_to_blur, &d_frame_blurred, &d_blurred_temp, BLUR_SIZE);
         timer.Start();
-        gaussian_and_median_blur(d_frame_to_blur,
-                        d_frame_blurred,
-                        d_blurred_temp,
-                        d_gaussian_filter,
-                        BLUR_SIZE,
-                        numRows(), numCols());
+
+
+        // gaussian_and_median_blur(d_frame_to_blur,
+        //                 d_frame_blurred,
+        //                 d_blurred_temp,
+        //                 d_gaussian_filter,
+        //                 BLUR_SIZE,
+        //                 numRows(), numCols());
+
+
         // gaussian_and_median_shared_blur(d_frame_to_blur,
         //                 d_frame_blurred,
         //                 d_blurred_temp,
         //                 d_gaussian_filter,
         //                 BLUR_SIZE,
         //                 numRows(), numCols());
+
         // gaussian_filter(d_frame_to_blur,
         //                 d_blurred_temp,
         //                 d_gaussian_filter,
@@ -298,9 +303,15 @@ void test_cuda(){
         // median_filter(d_blurred_temp,
         //                 d_frame_blurred,
         //                 numRows(), numCols());
-        // median_filter_shared(d_blurred_temp,
-        //                 d_frame_blurred,
-        //                 numRows(), numCols());
+
+        gaussian_filter(d_frame_to_blur,
+                        d_blurred_temp,
+                        d_gaussian_filter,
+                        BLUR_SIZE, BLUR_SIZE,
+                        numRows(), numCols());
+        median_filter_shared(d_blurred_temp,
+                        d_frame_blurred,
+                        numRows(), numCols());
 
         timer.Stop();
         cudaDeviceSynchronize(); checkCudaErrors(cudaGetLastError());
@@ -362,10 +373,10 @@ void test_cuda(){
 
     t_parallel += t_parallel_f - t_parallel_s;
     cv::Mat temp = cv::Mat(numRows(), numCols(), CV_8UC1, binary);
-    cv::imshow("origin", dst);
-    cvWaitKey(1);
-    cv::imshow("result", temp);
-    cvWaitKey(1);
+    // cv::imshow("origin", dst);
+    // cvWaitKey(1);
+    // cv::imshow("result", temp);
+    // cvWaitKey(1);
 
     //free up memory on the device
     cleanup();
@@ -381,8 +392,8 @@ void test_cuda(){
   cudaFree(d_gaussian_filter);
 
   //END LOOP and destroy the window
-  cvDestroyWindow("origin");
-  cvDestroyWindow("result");
+  // cvDestroyWindow("origin");
+  // cvDestroyWindow("result");
   t_total_f = cpu_timer();
   t_total = t_total_f-t_total_s;
   t_serial = t_total-t_parallel;
