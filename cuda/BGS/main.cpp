@@ -133,8 +133,8 @@ void test_cuda(){
   /*
   * create window to display results
   */
-  // cv::namedWindow("origin", CV_WINDOW_AUTOSIZE);
-  // cv::namedWindow("result", CV_WINDOW_AUTOSIZE);
+  cv::namedWindow("origin", CV_WINDOW_AUTOSIZE);
+  cv::namedWindow("result", CV_WINDOW_AUTOSIZE);
 
   /*
   * Absolute background
@@ -295,7 +295,10 @@ void test_cuda(){
         //                 d_gaussian_filter,
         //                 BLUR_SIZE, BLUR_SIZE,
         //                 numRows(), numCols());
-        // median_filter(d_frame_to_blur,
+        // median_filter(d_blurred_temp,
+        //                 d_frame_blurred,
+        //                 numRows(), numCols());
+        // median_filter_shared(d_blurred_temp,
         //                 d_frame_blurred,
         //                 numRows(), numCols());
 
@@ -359,10 +362,10 @@ void test_cuda(){
 
     t_parallel += t_parallel_f - t_parallel_s;
     cv::Mat temp = cv::Mat(numRows(), numCols(), CV_8UC1, binary);
-    // cv::imshow("origin", dst);
-    // cvWaitKey(1);
-    // cv::imshow("result", temp);
-    // cvWaitKey(1);
+    cv::imshow("origin", dst);
+    cvWaitKey(1);
+    cv::imshow("result", temp);
+    cvWaitKey(1);
 
     //free up memory on the device
     cleanup();
@@ -378,18 +381,18 @@ void test_cuda(){
   cudaFree(d_gaussian_filter);
 
   //END LOOP and destroy the window
-  // cvDestroyWindow("origin");
-  // cvDestroyWindow("result");
+  cvDestroyWindow("origin");
+  cvDestroyWindow("result");
   t_total_f = cpu_timer();
   t_total = t_total_f-t_total_s;
   t_serial = t_total-t_parallel;
 
   // print timing information
-  printf("Total Execution time: %f\n", t_total);
-  printf("Serial Execution part: %f\n", t_serial);
-  printf("Parallel Execution part: %f\n", t_parallel);
+  //printf("Total Execution time: %f\n", t_total);
+  //printf("Serial Execution part: %f\n", t_serial);
+  //printf("Parallel Execution part: %f\n", t_parallel);
   printf("Computation time for filtering: %f\n", t_filter);
-  printf("Computation time for background: %f\n", t_background);
-  printf("Communication time for GPU: %f\n", t_parallel - (t_filter + t_background));
+  //printf("Computation time for background: %f\n", t_background);
+  //printf("Communication time for GPU: %f\n", t_parallel - (t_filter + t_background));
 
 }

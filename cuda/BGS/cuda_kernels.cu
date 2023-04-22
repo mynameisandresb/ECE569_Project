@@ -3,7 +3,7 @@
 /*
 * Specify the size of a THREAD BLOCK of sizze THREAD_SIZE x THREAD_SIZE
 */
-#define THREAD_SIZE 11
+#define THREAD_SIZE 9
 /*
 * Flag whether to use separable gaussian filter or 2D
 */
@@ -215,66 +215,69 @@ void median_filter_kernel(unsigned char* d_frame,
 * Shared Memory Median filter CUDA kernel
 * NOTE: This method is from paper High Performance Median Filtering Algorithm Based on NVIDIA GPU Computing
 */
-__global__ void median_filter_kernel_shared(unsigned char *inputImageKernel, unsigned char *outputImagekernel, 
-                                            size_t imageHeight, size_t imageWidth)
+__global__ void median_filter_kernel_shared(unsigned char* d_frame,
+                                            unsigned char* d_blurred,
+                                            size_t numRows, size_t numCols)
 {
 	//Set the row and col value for each thread.
-	int row = blockIdx.y * blockDim.y + threadIdx.y;
-	int col = blockIdx.x * blockDim.x + threadIdx.x;
-	__shared__ unsigned char sharedmem[(THREAD_SIZE+2)]  [(THREAD_SIZE+2)];  //initialize shared memory
+	int col = blockIdx.y * blockDim.y + threadIdx.y;
+	int row = blockIdx.x * blockDim.x + threadIdx.x;
+	__shared__ unsigned char tile[(THREAD_SIZE+2)][(THREAD_SIZE+2)];  //initialize shared memory
 
-	//Take some values.
-	bool is_x_left = (threadIdx.x == 0), is_x_right = (threadIdx.x == THREAD_SIZE-1);
-  bool is_y_top = (threadIdx.y == 0), is_y_bottom = (threadIdx.y == THREAD_SIZE-1);
+	// Declares the boundary conditions for the shared memory
+	bool is_x_left = (threadIdx.x == 0);
+  bool is_x_right = (threadIdx.x == THREAD_SIZE-1);
+  bool is_y_top = (threadIdx.y == 0);
+  bool is_y_bottom = (threadIdx.y == THREAD_SIZE-1);
 
 	//Initialize with zero
 	if(is_x_left)
-		sharedmem[threadIdx.x][threadIdx.y+1] = 0;
+		tile[threadIdx.x][threadIdx.y+1] = 0;
 	else if(is_x_right)
-		sharedmem[threadIdx.x + 2][threadIdx.y+1]=0;
+		tile[threadIdx.x + 2][threadIdx.y+1]=0;
 	if (is_y_top){
-		sharedmem[threadIdx.x+1][threadIdx.y] = 0;
+		tile[threadIdx.x+1][threadIdx.y] = 0;
 		if(is_x_left)
-			sharedmem[threadIdx.x][threadIdx.y] = 0;
+			tile[threadIdx.x][threadIdx.y] = 0;
 		else if(is_x_right)
-			sharedmem[threadIdx.x+2][threadIdx.y] = 0;
+			tile[threadIdx.x+2][threadIdx.y] = 0;
 	}
 	else if (is_y_bottom){
-		sharedmem[threadIdx.x+1][threadIdx.y+2] = 0;
+		tile[threadIdx.x+1][threadIdx.y+2] = 0;
 		if(is_x_right)
-			sharedmem[threadIdx.x+2][threadIdx.y+2] = 0;
+			tile[threadIdx.x+2][threadIdx.y+2] = 0;
 		else if(is_x_left)
-			sharedmem[threadIdx.x][threadIdx.y+2] = 0;
+			tile[threadIdx.x][threadIdx.y+2] = 0;
 	}
 
 	//Setup pixel values
-	sharedmem[threadIdx.x+1][threadIdx.y+1] = inputImageKernel[row*imageWidth+col];
+	tile[threadIdx.x+1][threadIdx.y+1] = d_frame[row*numCols+col];
 	//Check for boundry conditions.
 	if(is_x_left && (col>0))
-		sharedmem[threadIdx.x][threadIdx.y+1] = inputImageKernel[row*imageWidth+(col-1)];
-	else if(is_x_right && (col<imageWidth-1))
-		sharedmem[threadIdx.x + 2][threadIdx.y+1]= inputImageKernel[row*imageWidth+(col+1)];
+		tile[threadIdx.x][threadIdx.y+1] = d_frame[row*numCols+(col-1)];
+	else if(is_x_right && (col<numCols-1))
+		tile[threadIdx.x + 2][threadIdx.y+1]= d_frame[row*numCols+(col+1)];
 	if (is_y_top && (row>0)){
-		sharedmem[threadIdx.x+1][threadIdx.y] = inputImageKernel[(row-1)*imageWidth+col];
+		tile[threadIdx.x+1][threadIdx.y] = d_frame[(row-1)*numCols+col];
 		if(is_x_left)
-			sharedmem[threadIdx.x][threadIdx.y] = inputImageKernel[(row-1)*imageWidth+(col-1)];
+			tile[threadIdx.x][threadIdx.y] = d_frame[(row-1)*numCols+(col-1)];
 		else if(is_x_right )
-			sharedmem[threadIdx.x+2][threadIdx.y] = inputImageKernel[(row-1)*imageWidth+(col+1)];
+			tile[threadIdx.x+2][threadIdx.y] = d_frame[(row-1)*numCols+(col+1)];
 	}
-	else if (is_y_bottom && (row<imageHeight-1)){
-		sharedmem[threadIdx.x+1][threadIdx.y+2] = inputImageKernel[(row+1)*imageWidth + col];
+	else if (is_y_bottom && (row<numRows-1)){
+		tile[threadIdx.x+1][threadIdx.y+2] = d_frame[(row+1)*numCols + col];
 		if(is_x_right)
-			sharedmem[threadIdx.x+2][threadIdx.y+2] = inputImageKernel[(row+1)*imageWidth+(col+1)];
+			tile[threadIdx.x+2][threadIdx.y+2] = d_frame[(row+1)*numCols+(col+1)];
 		else if(is_x_left)
-			sharedmem[threadIdx.x][threadIdx.y+2] = inputImageKernel[(row+1)*imageWidth+(col-1)];
+			tile[threadIdx.x][threadIdx.y+2] = d_frame[(row+1)*numCols+(col-1)];
 	}
 
 	__syncthreads();   //Wait for all threads to be done.
 
 	//Setup the filter.
-	unsigned char filterVector[9] = {sharedmem[threadIdx.x][threadIdx.y], sharedmem[threadIdx.x+1][threadIdx.y], sharedmem[threadIdx.x+2][threadIdx.y],
-                   sharedmem[threadIdx.x][threadIdx.y+1], sharedmem[threadIdx.x+1][threadIdx.y+1], sharedmem[threadIdx.x+2][threadIdx.y+1],
-                   sharedmem[threadIdx.x] [threadIdx.y+2], sharedmem[threadIdx.x+1][threadIdx.y+2], sharedmem[threadIdx.x+2][threadIdx.y+2]};
+	unsigned char filterVector[9] = {tile[threadIdx.x][threadIdx.y], tile[threadIdx.x+1][threadIdx.y], tile[threadIdx.x+2][threadIdx.y],
+                   tile[threadIdx.x][threadIdx.y+1], tile[threadIdx.x+1][threadIdx.y+1], tile[threadIdx.x+2][threadIdx.y+1],
+                   tile[threadIdx.x] [threadIdx.y+2], tile[threadIdx.x+1][threadIdx.y+2], tile[threadIdx.x+2][threadIdx.y+2]};
 
 	
 	{
@@ -288,7 +291,7 @@ __global__ void median_filter_kernel_shared(unsigned char *inputImageKernel, uns
             }
         }
     }
-	outputImagekernel[row*imageWidth+col] = filterVector[4];   //Set the output image values.
+	d_blurred[row*numCols+col] = filterVector[4];   //Set the output image values.
 	}
 }
 
