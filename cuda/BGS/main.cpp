@@ -57,6 +57,13 @@ void gaussian_and_median_blur(unsigned char* d_frame,
                      size_t d_filter_size,
                      size_t numRows, size_t numCols);
 
+void gaussian_optimized_and_median_blur(unsigned char* d_frame,
+                     unsigned char* d_blurred,
+                     unsigned char* d_blurred_temp,
+                     const float* const d_gfilter,
+                     size_t d_filter_size,
+                     size_t numRows, size_t numCols);
+
 void gaussian_and_median_shared_blur(unsigned char* d_frame,
                      unsigned char* d_blurred,
                      unsigned char* d_blurred_temp,
