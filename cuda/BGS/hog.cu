@@ -683,7 +683,7 @@ Mat hogFeature(Mat image, std::string filename){
   hp.Orientation= 0; //atoi(argv[7]);
 
   // Using optimized kernels versions for performance set
-  Cal_kernel_v = 0; //atoi(argv[3]); 0 or 1 
+  Cal_kernel_v = 1; //atoi(argv[3]); 0 or 1 
   Cell_kernel_v = 0; //atoi(argv[4]);
   Block_kernel_v = 0; //atoi(argv[5]);
   //Display_Cell_kernel_v = 0; //atoi(argv[6]);
