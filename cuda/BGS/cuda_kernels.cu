@@ -211,37 +211,43 @@ void median_filter_kernel(unsigned char* d_frame,
     d_blurred[index] = surround[middle]; 
 }
 
+// Shared memory algorithm found from
+//A Case Study of Parallel
+//Bilateral Filtering on the GPU
+// http://www.diva-portal.org/smash/get/diva2:872665/FULLTEXT01.pdf
+// Which uses shared memory technique
+// Van Werkhoven, Jason Maassen, Henri E. Bal, and Frank J. Seinstra. Optimizing Convolution Operations on GPUs Using Adaptive Tiling.
+// Future Gener. Comput. Syst., 30:14–26, January 2014.
 __global__ void tiled_median_filter(unsigned char* d_frame,
                                     unsigned char* d_blurred,
                                     size_t numRows, size_t numCols) {
   // Creates the variables for shared memory and easy of access
-  __shared__ unsigned char tile[THREAD_SIZE][THREAD_SIZE];
-  int bx = blockIdx.x;  int by = blockIdx.y;
-  int tx = threadIdx.x; int ty = threadIdx.y;
+  __shared__ unsigned char tile[THREAD_SIZE + 2][THREAD_SIZE + 2];
+  size_t tileidx = threadIdx.x; int tileidy = threadIdx.y;
+  size_t tiledim = blockDim.x + 2;
+  size_t xstart = max(0, blockIdx.x * blockDim.x);
+  size_t ystart = max(0, blockIdx.y * blockDim.y);
+  size_t xend = min(numCols, xstart + blockDim.x + 2);
+  size_t yend = min(numRows, ystart + blockDim.y + 2);
+  size_t col = blockIdx.y * blockDim.y + threadIdx.y;
+	size_t row = blockIdx.x * blockDim.x + threadIdx.x;
 
-  // Finds the row and col that this thread is working on
-  int col = by * blockDim.y + ty;
-  int row = bx * blockDim.x + tx;
-
-  // Loop over the A and B tiles required to compute the P element
-  for (int p = 0; p < (numCols-1)/THREAD_SIZE+1; ++p){
-
-    // Collaborative loading of A into shared memory
-    if(row < numRows && p * THREAD_SIZE+tx < numCols){
-      tile[ty][tx] = d_frame[row*numCols + p*THREAD_SIZE+tx];
-    } else {
-      tile[ty][tx] = 0;
+  for (int y = ystart + threadIdx.y; y < yend; y += blockDim.y) {
+    for (int x = xstart + threadIdx.x; x < xend; x += blockDim.x) {
+      tile[tileidx][tileidy] = d_frame[y * numCols + x];
+      tileidy += blockDim.y;
     }
-
-    // Allowing loading into shared memory to sync
-    __syncthreads();
+    tileidy = tileidy + blockDim.y;
+    tileidx += threadIdx.x;
   }
+  __syncthreads();
 
 	//Setup the filter.
-	unsigned char filterVector[9] = {tile[threadIdx.x][threadIdx.y], tile[threadIdx.x+1][threadIdx.y], tile[threadIdx.x+2][threadIdx.y],
+	unsigned char filterVector[9] = {tile[threadIdx.x+1][threadIdx.y], tile[threadIdx.x+1][threadIdx.y], tile[threadIdx.x+2][threadIdx.y],
                    tile[threadIdx.x][threadIdx.y+1], tile[threadIdx.x+1][threadIdx.y+1], tile[threadIdx.x+2][threadIdx.y+1],
                    tile[threadIdx.x] [threadIdx.y+2], tile[threadIdx.x+1][threadIdx.y+2], tile[threadIdx.x+2][threadIdx.y+2]};
 
+	
   for (int i = 0; i < 9; i++) {
       for (int j = i + 1; j < 9; j++) {
           if (filterVector[i] > filterVector[j]) { 
@@ -252,9 +258,10 @@ __global__ void tiled_median_filter(unsigned char* d_frame,
           }
       }
   }
-
   d_blurred[row*numCols+col] = filterVector[4];   //Set the output image values.
 }
+
+
 
 /**
 * Shared Memory Median filter CUDA kernel
@@ -558,8 +565,8 @@ void gaussian_and_median_shared_blur(unsigned char* d_frame,
                                                   numRows, numCols);
   #endif
 
-  median_filter_kernel_shared<<<gridSize, blockSize>>>(d_blurred_temp, d_blurred, numRows, numCols);
-  //tiled_median_filter<<<gridSize, blockSize>>>(d_blurred_temp, d_blurred, numRows, numCols);
+  //median_filter_kernel_shared<<<gridSize, blockSize>>>(d_blurred_temp, d_blurred, numRows, numCols);
+  tiled_median_filter<<<gridSize, blockSize>>>(d_blurred_temp, d_blurred, numRows, numCols);
 
   cudaDeviceSynchronize(); checkCudaErrors(cudaGetLastError());
 }

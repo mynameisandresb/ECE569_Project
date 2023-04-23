@@ -311,20 +311,20 @@ void test_cuda(){
         //                 numRows(), numCols());
   
 
-        // gaussian_and_median_shared_blur(d_frame_to_blur,
-        //                 d_frame_blurred,
-        //                 d_blurred_temp,
-        //                 d_gaussian_filter,
-        //                 BLUR_SIZE,
-        //                 numRows(), numCols());
-
-
-        gaussian_optimized_and_median_shared_blur(d_frame_to_blur,
+        gaussian_and_median_shared_blur(d_frame_to_blur,
                         d_frame_blurred,
                         d_blurred_temp,
                         d_gaussian_filter,
                         BLUR_SIZE,
                         numRows(), numCols());
+
+
+        // gaussian_optimized_and_median_shared_blur(d_frame_to_blur,
+        //                 d_frame_blurred,
+        //                 d_blurred_temp,
+        //                 d_gaussian_filter,
+        //                 BLUR_SIZE,
+        //                 numRows(), numCols());
 
 
         // gaussian_filter(d_frame_to_blur,
