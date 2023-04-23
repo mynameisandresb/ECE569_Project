@@ -135,6 +135,79 @@ __global__ void Cal_kernel_v1(uchar *GPU_i, int *Orientation,float *Gradient, uc
 
 }
 
+// Cal_kernel Optimized Version 2
+__global__ void Cal_kernel_v2(uchar *GPU_i, int *Orientation,float *Gradient, uchar *DisplayOrientation, HogProp hp){
+  __shared__ uchar i_shared[BOX_SIZE+2][BOX_SIZE+2];
+  
+  // get thread and block indices
+  int tx = threadIdx.x;
+  int ty = threadIdx.y;
+  int bx = blockIdx.x * blockDim.x;
+  int by = blockIdx.y * blockDim.y;
+  int i = bx + tx;  // row of image
+  int j = by + ty;  // col of image
+
+  // load pixels into shared memory
+  i_shared[ty+1][tx+1] = GPU_i[i*hp.ImgCol+j];
+  if (tx == 0) {
+    i_shared[ty+1][tx] = GPU_i[i*hp.ImgCol+j-1];
+  }
+  if (tx == blockDim.x-1) {
+    i_shared[ty+1][tx+2] = GPU_i[i*hp.ImgCol+j+1];
+  }
+  if (ty == 0) {
+    i_shared[ty][tx+1] = GPU_i[(i-1)*hp.ImgCol+j];
+  }
+  if (ty == blockDim.y-1) {
+    i_shared[ty+2][tx+1] = GPU_i[(i+1)*hp.ImgCol+j];
+  }
+  __syncthreads();
+
+  // compute gx and gy
+  float gx = (float)(i_shared[ty+1][tx]-i_shared[ty+1][tx+2]);
+  float gy = (float)(i_shared[ty][tx+1]-i_shared[ty+2][tx+1]);
+
+  // compute gradient and orientation
+  if(i>0 && i < hp.ImgRow-1 && j >0 && j < hp.ImgCol-1){
+    Gradient[i*hp.ImgCol+j] = sqrtf(gx*gx+gy*gy);
+    float ang = atan2f(gy,gx);
+    float displayang;
+  if(ang<0) {
+      displayang=8*(ang+PI);
+  }
+  else {
+      displayang=8*ang;
+  }
+  if(displayang<PI | displayang>7*PI) {
+      DisplayOrientation[i*hp.ImgCol+j]=0;
+  }
+  else if(displayang>=PI & displayang<3*PI) {
+      DisplayOrientation[i*hp.ImgCol+j]=1;
+  }
+  else if(displayang>=3*PI & displayang<5*PI) {
+      DisplayOrientation[i*hp.ImgCol+j]=2;
+  }
+  else {
+      DisplayOrientation[i*hp.ImgCol+j]=3;
+  }
+  if (ang<0) {
+    if(hp.Orientation==0) { 
+      ang = ang+ PI; 
+    }
+    else { 
+      ang = 2*PI+ang; 
+    }
+  }
+  if(hp.Orientation==0) {
+    ang=(hp.NumBins)*ang/PI;
+  }
+  else {
+    ang=(hp.NumBins)*ang/(2*PI);
+  }
+    Orientation[i*hp.ImgCol+j]=(int)ang;
+  }
+}
+
 //-------------------------------------------------------------Cell_kernel-------------------------------------------------------------------------
 
 // Cell_kernel Original Version 0
@@ -722,7 +795,7 @@ Mat hogFeature(char *argv[]){
   printf("\n-----------------------------------------------------------\n\n");
 
 
-  if(Cal_kernel_v>1 || Cal_kernel_v<0) {
+  if(Cal_kernel_v>2 || Cal_kernel_v<0) {
 		printf("\n\nCal_kernel_v = %d is invalid\n\n", Cal_kernel_v);
 		exit(EXIT_FAILURE);
 	}
@@ -935,6 +1008,8 @@ cudaError_t launch_helper(float* Runtimes){
 
  if(Cal_kernel_v==1){
   Cal_kernel_v1<<<numBlocks, threadsPerBlock,0,stream[0]>>>(GPU_idata,Orientation,Gradient,DisplayOrientation,hp);
+ } else if(Cal_kernel_v==2) {
+  Cal_kernel_v2<<<numBlocks, threadsPerBlock,0,stream[0]>>>(GPU_idata,Orientation,Gradient,DisplayOrientation,hp);
  } else {
   Cal_kernel_v0<<<numBlocks, threadsPerBlock,0,stream[0]>>>(GPU_idata,Orientation,Gradient,DisplayOrientation,hp);
  }
