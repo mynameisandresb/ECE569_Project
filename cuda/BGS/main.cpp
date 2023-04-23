@@ -13,9 +13,11 @@
 // Do we use OpenCV's Gaussian and median blurring
 #define OPENCV_PROPROCESS 0
 // Use separable 1D filter or 2D Gaussian filter
-#define SEPARABLE_GAUSSIAN_FILTER 0
+#define SEPARABLE_GAUSSIAN_FILTER 1
 // Do we do any preprocessing (blurring) at all?
 #define PREPROCESSING 1
+
+#define OPTIMIZED_BGS 1
 
 /**
 * function specifications for CUDA kernel calls
@@ -57,33 +59,52 @@ void gaussian_and_median_blur(unsigned char* d_frame,
                      size_t d_filter_size,
                      size_t numRows, size_t numCols);
 
-void gaussian_optimized_and_median_blur(unsigned char* d_frame,
-                     unsigned char* d_blurred,
-                     unsigned char* d_blurred_temp,
-                     const float* const d_gfilter,
-                     size_t d_filter_size,
-                     size_t numRows, size_t numCols);
-
-void gaussian_and_median_shared_blur(unsigned char* d_frame,
-                     unsigned char* d_blurred,
-                     unsigned char* d_blurred_temp,
-                     const float* const d_gfilter,
-                     size_t d_filter_size,
-                     size_t numRows, size_t numCols);
-
-
-void gaussian_optimized_and_median_shared_blur(unsigned char* d_frame,
-                     unsigned char* d_blurred,
-                     unsigned char* d_blurred_temp,
-                     const float* const d_gfilter,
-                     size_t d_filter_size,
-                     size_t numRows, size_t numCols);
-
 void median_filter(unsigned char* d_frame,
                      unsigned char* d_blurred,
                      size_t numRows, size_t numCols);
 
-void median_filter_shared(unsigned char* d_frame,
+
+/**
+* function specifications for CUDA kernel calls
+*/ 
+void gaussian_background_opt(unsigned char * const d_frame,
+                            unsigned char* const d_amean, 
+                            unsigned char* const d_cmean,
+                            unsigned char* const d_avar,
+                            unsigned char* const d_cvar,
+                            unsigned char* const d_bin,
+                            int * const d_aage,
+                            int * const d_cage,
+                            size_t numRows, size_t numCols);
+
+/*
+Two dimensional convolution
+*/
+void gaussian_filter_opt(unsigned char* d_frame,
+                     unsigned char* d_blurred,
+                     const float* const d_gfilter,
+                     size_t d_filter_width,
+                     size_t d_filter_height,
+                     size_t numRows, size_t numCols);
+
+/*
+One dimensional, separable convolution
+*/
+void gaussian_filter_separable_opt(unsigned char* d_frame,
+                     unsigned char* d_blurred,
+                     unsigned char* d_blurred_temp,
+                     const float* const d_gfilter,
+                     size_t d_filter_size,
+                     size_t numRows, size_t numCols);
+
+void gaussian_and_median_blur_opt(unsigned char* d_frame,
+                     unsigned char* d_blurred,
+                     unsigned char* d_blurred_temp,
+                     const float* const d_gfilter,
+                     size_t d_filter_size,
+                     size_t numRows, size_t numCols);
+
+void median_filter_opt(unsigned char* d_frame,
                      unsigned char* d_blurred,
                      size_t numRows, size_t numCols);
 
@@ -148,7 +169,7 @@ void test_cuda(){
   /*
   * create window to display results
   */
-  cv::namedWindow("origin", CV_WINDOW_AUTOSIZE);
+  // cv::namedWindow("origin", CV_WINDOW_AUTOSIZE);
   cv::namedWindow("result", CV_WINDOW_AUTOSIZE);
 
   /*
@@ -277,7 +298,7 @@ void test_cuda(){
     //BLURRING
     #if PREPROCESSING == 1
       //do we use opencv
-      #if OPENCV_PROPROCESS == 1 
+      #if OPENCV_PROPROCESS == 1
         cv::Mat dst, destination;
         cv::GaussianBlur( frame, destination, cv::Size(9,9), 0, 0 );
         cv::medianBlur ( destination, dst, 3 );
@@ -294,56 +315,23 @@ void test_cuda(){
         preprocessGaussianBlur(&frame, &d_frame_to_blur, &d_frame_blurred, &d_blurred_temp, BLUR_SIZE);
         timer.Start();
 
-
-        // gaussian_and_median_blur(d_frame_to_blur,
+        // gaussian_filter_separable_opt(d_frame_to_blur,
         //                 d_frame_blurred,
         //                 d_blurred_temp,
         //                 d_gaussian_filter,
         //                 BLUR_SIZE,
         //                 numRows(), numCols());
-
-
-        // gaussian_optimized_and_median_blur(d_frame_to_blur,
+        // median_filter_opt(d_blurred_temp,
         //                 d_frame_blurred,
-        //                 d_blurred_temp,
-        //                 d_gaussian_filter,
-        //                 BLUR_SIZE,
         //                 numRows(), numCols());
-  
 
-        gaussian_and_median_shared_blur(d_frame_to_blur,
+
+        gaussian_and_median_blur_opt(d_frame_to_blur,
                         d_frame_blurred,
                         d_blurred_temp,
                         d_gaussian_filter,
                         BLUR_SIZE,
                         numRows(), numCols());
-
-
-        // gaussian_optimized_and_median_shared_blur(d_frame_to_blur,
-        //                 d_frame_blurred,
-        //                 d_blurred_temp,
-        //                 d_gaussian_filter,
-        //                 BLUR_SIZE,
-        //                 numRows(), numCols());
-
-
-        // gaussian_filter(d_frame_to_blur,
-        //                 d_blurred_temp,
-        //                 d_gaussian_filter,
-        //                 BLUR_SIZE, BLUR_SIZE,
-        //                 numRows(), numCols());
-        // median_filter(d_blurred_temp,
-        //                 d_frame_blurred,
-        //                 numRows(), numCols());
-
-        // gaussian_filter(d_frame_to_blur,
-        //                 d_blurred_temp,
-        //                 d_gaussian_filter,
-        //                 BLUR_SIZE, BLUR_SIZE,
-        //                 numRows(), numCols());
-        // median_filter_shared(d_blurred_temp,
-        //                 d_frame_blurred,
-        //                 numRows(), numCols());
 
         timer.Stop();
         cudaDeviceSynchronize(); checkCudaErrors(cudaGetLastError());
@@ -384,7 +372,12 @@ void test_cuda(){
     timer.Start();
 
     // CALL DSGM
-    gaussian_background(d_frame,d_amean,d_cmean,d_avar,d_cvar, d_bin, d_aage, d_cage, numRows(), numCols());
+    #if OPTIMIZED_BGS == 1
+    // CALL DSGM
+      gaussian_background_opt(d_frame,d_amean,d_cmean,d_avar,d_cvar, d_bin, d_aage, d_cage, numRows(), numCols());
+    #else
+      gaussian_background(d_frame,d_amean,d_cmean,d_avar,d_cvar, d_bin, d_aage, d_cage, numRows(), numCols());
+    #endif
 
     timer.Stop();
     cudaDeviceSynchronize(); checkCudaErrors(cudaGetLastError());
@@ -405,8 +398,8 @@ void test_cuda(){
 
     t_parallel += t_parallel_f - t_parallel_s;
     cv::Mat temp = cv::Mat(numRows(), numCols(), CV_8UC1, binary);
-    cv::imshow("origin", dst);
-    cvWaitKey(1);
+    // cv::imshow("origin", dst);
+    // cvWaitKey(1);
     cv::imshow("result", temp);
     cvWaitKey(1);
 
@@ -424,7 +417,7 @@ void test_cuda(){
   cudaFree(d_gaussian_filter);
 
   //END LOOP and destroy the window
-  cvDestroyWindow("origin");
+  // cvDestroyWindow("origin");
   cvDestroyWindow("result");
   t_total_f = cpu_timer();
   t_total = t_total_f-t_total_s;
@@ -434,8 +427,8 @@ void test_cuda(){
   //printf("Total Execution time: %f\n", t_total);
   //printf("Serial Execution part: %f\n", t_serial);
   //printf("Parallel Execution part: %f\n", t_parallel);
-  printf("Computation time for filtering: %f\n", t_filter);
-  //printf("Computation time for background: %f\n", t_background);
+  printf("%f\n", t_filter);
+  //printf("%f\n", t_background);
   //printf("Communication time for GPU: %f\n", t_parallel - (t_filter + t_background));
 
 }
