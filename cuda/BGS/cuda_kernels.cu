@@ -7,7 +7,7 @@
 /*
 * Flag whether to use separable gaussian filter or 2D
 */
-#define SEPARATED_GAUSSIAN_FILTER 1
+#define SEPARATED_GAUSSIAN_FILTER 0
 
 /**
 * CUDA Kernel for DSGM
@@ -564,6 +564,40 @@ void gaussian_and_median_shared_blur(unsigned char* d_frame,
   cudaDeviceSynchronize(); checkCudaErrors(cudaGetLastError());
 }
 
+void gaussian_optimized_and_median_shared_blur(unsigned char* d_frame,
+                     unsigned char* d_blurred,
+                     unsigned char* d_blurred_temp,
+                     const float* const d_gfilter,
+                     size_t d_filter_size,
+                     size_t numRows, size_t numCols)
+{
+
+  const dim3 blockSize(THREAD_SIZE, THREAD_SIZE, 1);
+  const dim3 gridSize(numRows / THREAD_SIZE + 1, numCols / THREAD_SIZE + 1, 1); 
+
+  #if SEPARATED_GAUSSIAN_FILTER == 1
+  // once in the x direction
+  gaussian_filter_kernel_separable<<<gridSize, blockSize>>>(d_frame, d_blurred, d_gfilter, 
+                                                  d_filter_size, 
+                                                  numRows, numCols, true);
+
+  //once in the y direction
+  gaussian_filter_kernel_separable<<<gridSize, blockSize>>>(d_blurred, d_blurred_temp, d_gfilter, 
+                                                  d_filter_size, 
+                                                  numRows, numCols, false);
+  #else
+  // in this case, also need to make sure the filter is 2d
+  gaussian_filter_kernel_optimized<<<gridSize, blockSize>>>(d_frame, d_blurred_temp, d_gfilter, 
+                                                  d_filter_size, d_filter_size, 
+                                                  numRows, numCols);
+  #endif
+
+  median_filter_kernel_shared<<<gridSize, blockSize>>>(d_blurred_temp, d_blurred, numRows, numCols);
+  //tiled_median_filter<<<gridSize, blockSize>>>(d_blurred_temp, d_blurred, numRows, numCols);
+
+  cudaDeviceSynchronize(); checkCudaErrors(cudaGetLastError());
+}
+
 /**
 * A sequenced call to either the separable gaussian filter or the 2d filter and a subsequent call
 * to the median filter CUDA kernels to run on the GPU with the device memory pointers provided
@@ -591,7 +625,7 @@ void gaussian_and_median_blur(unsigned char* d_frame,
                                                   numRows, numCols, false);
   #else
   // in this case, also need to make sure the filter is 2d
-  gaussian_filter_kernel<<<gridSize, blockSize>>>(d_frame, d_blurred_temp, d_gfilter, 
+  gaussian_filter_kernel_optimized<<<gridSize, blockSize>>>(d_frame, d_blurred_temp, d_gfilter, 
                                                   d_filter_size, d_filter_size, 
                                                   numRows, numCols);
   #endif

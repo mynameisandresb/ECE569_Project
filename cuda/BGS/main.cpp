@@ -13,7 +13,7 @@
 // Do we use OpenCV's Gaussian and median blurring
 #define OPENCV_PROPROCESS 0
 // Use separable 1D filter or 2D Gaussian filter
-#define SEPARABLE_GAUSSIAN_FILTER 1
+#define SEPARABLE_GAUSSIAN_FILTER 0
 // Do we do any preprocessing (blurring) at all?
 #define PREPROCESSING 1
 
@@ -65,6 +65,14 @@ void gaussian_optimized_and_median_blur(unsigned char* d_frame,
                      size_t numRows, size_t numCols);
 
 void gaussian_and_median_shared_blur(unsigned char* d_frame,
+                     unsigned char* d_blurred,
+                     unsigned char* d_blurred_temp,
+                     const float* const d_gfilter,
+                     size_t d_filter_size,
+                     size_t numRows, size_t numCols);
+
+
+void gaussian_optimized_and_median_shared_blur(unsigned char* d_frame,
                      unsigned char* d_blurred,
                      unsigned char* d_blurred_temp,
                      const float* const d_gfilter,
@@ -140,8 +148,8 @@ void test_cuda(){
   /*
   * create window to display results
   */
-  // cv::namedWindow("origin", CV_WINDOW_AUTOSIZE);
-  // cv::namedWindow("result", CV_WINDOW_AUTOSIZE);
+  cv::namedWindow("origin", CV_WINDOW_AUTOSIZE);
+  cv::namedWindow("result", CV_WINDOW_AUTOSIZE);
 
   /*
   * Absolute background
@@ -295,12 +303,29 @@ void test_cuda(){
         //                 numRows(), numCols());
 
 
+        // gaussian_optimized_and_median_blur(d_frame_to_blur,
+        //                 d_frame_blurred,
+        //                 d_blurred_temp,
+        //                 d_gaussian_filter,
+        //                 BLUR_SIZE,
+        //                 numRows(), numCols());
+  
+
         // gaussian_and_median_shared_blur(d_frame_to_blur,
         //                 d_frame_blurred,
         //                 d_blurred_temp,
         //                 d_gaussian_filter,
         //                 BLUR_SIZE,
         //                 numRows(), numCols());
+
+
+        gaussian_optimized_and_median_shared_blur(d_frame_to_blur,
+                        d_frame_blurred,
+                        d_blurred_temp,
+                        d_gaussian_filter,
+                        BLUR_SIZE,
+                        numRows(), numCols());
+
 
         // gaussian_filter(d_frame_to_blur,
         //                 d_blurred_temp,
@@ -311,14 +336,14 @@ void test_cuda(){
         //                 d_frame_blurred,
         //                 numRows(), numCols());
 
-        gaussian_filter(d_frame_to_blur,
-                        d_blurred_temp,
-                        d_gaussian_filter,
-                        BLUR_SIZE, BLUR_SIZE,
-                        numRows(), numCols());
-        median_filter_shared(d_blurred_temp,
-                        d_frame_blurred,
-                        numRows(), numCols());
+        // gaussian_filter(d_frame_to_blur,
+        //                 d_blurred_temp,
+        //                 d_gaussian_filter,
+        //                 BLUR_SIZE, BLUR_SIZE,
+        //                 numRows(), numCols());
+        // median_filter_shared(d_blurred_temp,
+        //                 d_frame_blurred,
+        //                 numRows(), numCols());
 
         timer.Stop();
         cudaDeviceSynchronize(); checkCudaErrors(cudaGetLastError());
@@ -380,10 +405,10 @@ void test_cuda(){
 
     t_parallel += t_parallel_f - t_parallel_s;
     cv::Mat temp = cv::Mat(numRows(), numCols(), CV_8UC1, binary);
-    // cv::imshow("origin", dst);
-    // cvWaitKey(1);
-    // cv::imshow("result", temp);
-    // cvWaitKey(1);
+    cv::imshow("origin", dst);
+    cvWaitKey(1);
+    cv::imshow("result", temp);
+    cvWaitKey(1);
 
     //free up memory on the device
     cleanup();
@@ -399,8 +424,8 @@ void test_cuda(){
   cudaFree(d_gaussian_filter);
 
   //END LOOP and destroy the window
-  // cvDestroyWindow("origin");
-  // cvDestroyWindow("result");
+  cvDestroyWindow("origin");
+  cvDestroyWindow("result");
   t_total_f = cpu_timer();
   t_total = t_total_f-t_total_s;
   t_serial = t_total-t_parallel;
