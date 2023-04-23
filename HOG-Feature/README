@@ -25,7 +25,7 @@ For optimized versions used:
 ./HOG 1 2 3 1 1
 
 Valid version numbers that can be used for inputs:
-Cal_kernel_v#: 0 or 1
+Cal_kernel_v#: 0, 1, or 2
 Cell_kernel_v#: 0, 1, or 2
 Block_kernel_v#: 0, 1, 2, or 3
 Display_Cell_kernel_v#: 0 or 1
@@ -34,18 +34,19 @@ display_kernel_v#: 0, 1, or 2
 The different kernel versions:
 1.	Cal_kernel_v0
 2.	Cal_kernel_v1
-3.	Cell_kernel_v0
-4.	Cell_kernel_v1
-5.	Cell_kernel_v2
-6.	Block_kernel_v0
-7.	Block_kernel_v1
-8.	Block_kernel_v2
-9.	Block_kernel_v3
-10.	Display_Cell_kernel_v0
-11.	Display_Cell_kernel_v1
-12.	display_kernel_v0
-13.	display_kernel_v1
-14.	display_kernel_v2
+3.	Cal_kernel_v2
+4.	Cell_kernel_v0
+5.	Cell_kernel_v1
+6.	Cell_kernel_v2
+7.	Block_kernel_v0
+8.	Block_kernel_v1
+9.	Block_kernel_v2
+10.	Block_kernel_v3
+11.	Display_Cell_kernel_v0
+12.	Display_Cell_kernel_v1
+13.	display_kernel_v0
+14.	display_kernel_v1
+15.	display_kernel_v2
 
 The HOG features can be found in the bin folder after running:
 HOG Features written to Feature.txt
