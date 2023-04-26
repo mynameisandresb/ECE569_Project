@@ -7,7 +7,7 @@
 /*
 * Flag whether to use separable gaussian filter or 2D
 */
-#define SEPARATED_GAUSSIAN_FILTER 1
+#define SEPARATED_GAUSSIAN_FILTER 0
 
 /**
 * CUDA Kernel for DSGM
@@ -117,43 +117,56 @@ void gaussian_background_opt(unsigned char* const d_frame,
 
 }
 
-/**
-* 2D, non-separable Gaussian filter kernel
-*/
 __global__
 void gaussian_filter_kernel_opt(unsigned char* d_frame,
-                     unsigned char* d_blurred,
-                     const float* const d_gfilter,
-                     size_t d_filter_width,
-                     size_t d_filter_height,
-                     size_t numRows, size_t numCols){
+							unsigned char* d_blurred,
+							const float* const d_gfilter,
+							const int d_filter_width,
+							const int d_filter_height,
+							const int numRows, const int numCols){
 
-  const size_t r = blockIdx.x * blockDim.x + threadIdx.x;
-  const size_t c = blockIdx.y * blockDim.y + threadIdx.y;
-  const size_t index = r * numCols + c; //the center pixel being blurred
+	const int tx = threadIdx.x;
+	const int ty = threadIdx.y;
+	const int bx = blockIdx.x;
+	const int by = blockIdx.y;
+	const int row = by * blockDim.y + ty;
+	const int col = bx * blockDim.x + tx;
+	const int FILTER_WIDTH = d_filter_width;
+	const int FILTER_HEIGHT = d_filter_height;
 
-  if (index >= numRows * numCols) return;
+	__shared__ float s_data[THREAD_SIZE + 9 - 1][THREAD_SIZE + 9 - 1];
 
-  int halfway_point = d_filter_width/2;
-  float blurred_pixel = 0.0f;
+	if(row < numRows && col < numCols){
+		s_data[ty][tx] = d_frame[row * numCols + col];
+	}
 
-  // Iterate over 2D Gaussian kernel
-  for (int i = -halfway_point; i <= halfway_point; ++i){ 
-    for (int j = -halfway_point; j <= halfway_point; ++j){ 
-            // get the location of the desired pixel, clamped to borders of the image
-            int h = fmin(fmax((float)(r + i), 0.f), (float)(numRows-1)); 
-            int w = fmin(fmax((float)(c + j), 0.f), (float)(numCols-1)); 
-            int current_pixel_id = w + numCols * h;
-            float current_pixel = static_cast<float>(d_frame[current_pixel_id]); 
+	if (tx < FILTER_WIDTH - 1 && col + THREAD_SIZE < numCols) {
+		s_data[ty][tx + THREAD_SIZE] = d_frame[row * numCols + col + THREAD_SIZE];
+	}
 
-            // now, get the associated weight in the filter
-            current_pixel_id = (i + halfway_point) * d_filter_width + j + halfway_point; 
-            float weight = d_gfilter[current_pixel_id]; 
-            blurred_pixel += current_pixel * weight; 
-        } 
-    } 
- 
-  d_blurred[index] = static_cast<int>(blurred_pixel); 
+	if (ty < FILTER_HEIGHT - 1 && row + THREAD_SIZE < numRows) {
+		s_data[ty + THREAD_SIZE][tx] = d_frame[(row + THREAD_SIZE) * numCols + col];
+	}
+
+	if (tx < FILTER_WIDTH - 1 && ty < FILTER_HEIGHT - 1 && col + THREAD_SIZE < numCols && row + THREAD_SIZE < numRows) 	{
+		s_data[ty + THREAD_SIZE][tx + THREAD_SIZE] = d_frame[(row + THREAD_SIZE) * numCols + col + THREAD_SIZE];
+	}
+
+	__syncthreads();
+
+  float sum = 0.0f;
+  #pragma unroll
+  for (int i = 0; i < FILTER_HEIGHT; i++) {
+    #pragma unroll		
+    for (int j = 0; j < FILTER_WIDTH; j++) {
+        float current_pixel = static_cast<float>(s_data[ty+i][tx+j]);
+        //float current_pixel = static_cast<float>(d_frame[(row + i) * numCols + col + j];);
+        sum += current_pixel * d_gfilter[i * FILTER_WIDTH + j];
+    }
+  }
+	if (row < (numRows - 7) && col < (numCols - 7)) {
+		d_blurred[row * numCols + col] = static_cast<int>(sum);
+	}
 }
 
 /**
@@ -353,7 +366,7 @@ void gaussian_filter_opt(unsigned char* d_frame,
 {
 
   const dim3 blockSize(THREAD_SIZE, THREAD_SIZE, 1);
-  const dim3 gridSize(numRows / THREAD_SIZE + 1, numCols / THREAD_SIZE + 1, 1); 
+  const dim3 gridSize(numCols / THREAD_SIZE + 1, numRows / THREAD_SIZE + 1, 1); 
   gaussian_filter_kernel_opt<<<gridSize, blockSize>>>(d_frame, d_blurred, d_gfilter, 
                                                   d_filter_width, d_filter_height, 
                                                   numRows, numCols);
