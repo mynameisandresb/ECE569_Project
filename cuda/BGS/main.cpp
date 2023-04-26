@@ -321,23 +321,23 @@ void test_cuda(){
         //                 d_gaussian_filter,
         //                 BLUR_SIZE,
         //                 numRows(), numCols());
-        gaussian_filter_opt(d_frame_to_blur,
-                            d_blurred_temp,
-                            d_gaussian_filter,
-                            BLUR_SIZE,
-                            BLUR_SIZE,
-                            numRows(), numCols());
-        median_filter_opt(d_blurred_temp,
-                        d_frame_blurred,
-                        numRows(), numCols());
-
-
-        // gaussian_and_median_blur_opt(d_frame_to_blur,
+        // gaussian_filter_opt(d_frame_to_blur,
+        //                     d_blurred_temp,
+        //                     d_gaussian_filter,
+        //                     BLUR_SIZE,
+        //                     BLUR_SIZE,
+        //                     numRows(), numCols());
+        // median_filter(d_blurred_temp,
         //                 d_frame_blurred,
-        //                 d_blurred_temp,
-        //                 d_gaussian_filter,
-        //                 BLUR_SIZE,
         //                 numRows(), numCols());
+
+
+        gaussian_and_median_blur_opt(d_frame_to_blur,
+                        d_frame_blurred,
+                        d_blurred_temp,
+                        d_gaussian_filter,
+                        BLUR_SIZE,
+                        numRows(), numCols());
 
         timer.Stop();
         cudaDeviceSynchronize(); checkCudaErrors(cudaGetLastError());

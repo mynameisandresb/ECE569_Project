@@ -506,7 +506,7 @@ void gaussian_and_median_blur_opt(unsigned char* d_frame,
                                                   numRows, numCols);
   #endif
 
-  median_filter_kernel_v2<<<gridSize, blockSize>>>(d_blurred_temp, d_blurred, numRows, numCols);
+  median_filter_kernel_v1<<<gridSize, blockSize>>>(d_blurred_temp, d_blurred, numRows, numCols);
   
   cudaDeviceSynchronize(); checkCudaErrors(cudaGetLastError());
 }
