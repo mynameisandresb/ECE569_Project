@@ -1,3 +1,7 @@
+build/
+opencv-3.3.0/
+opencv.zip
+.vscode
 Videos/
 BGS.xcodeproj/xcuserdata/
 BGS.xcodeproj/project.xcworkspace/xcshareddata/
