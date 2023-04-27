@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
+
 // CUDA stuff:
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
@@ -13,16 +14,16 @@
 #include <opencv2/highgui/highgui.hpp>
 
 //other support
-#include "HogSupport.h"
-#define BOX_SIZE 8
-cudaError_t launch_helper(float* Runtimes);
+ #include "HogSupport.h"
+ #define BOX_SIZE 8
+ cudaError_t launch_helper(float* Runtimes, int d1_flag);
 
-struct HogProp hp;
-struct DisplayProp dp;
-uchar * CPU_InputArray, * CPU_OutputArray;
-float *CPU_CellArray,*CPU_FeatureArray, *CPU_Hist;
+ struct HogProp hp;
+ struct DisplayProp dp;
+ uchar * CPU_InputArray, * CPU_OutputArray;
+ float *CPU_CellArray,*CPU_FeatureArray, *CPU_Hist, *DATA_FeatureMatrix;
 
-cudaStream_t stream[2];
+ cudaStream_t stream[2];
 
 using namespace cv;
 
@@ -194,276 +195,255 @@ __global__ void display_kernel(float *Displayhistogram, uchar *GPU_odata, Displa
   }
   if(k==0) GPU_odata[tempid]=255;
 }
-//###################################################################################################################################################
-//------------------------------------------------------------main function--------------------------------------------------------------------------
-//###################################################################################################################################################
-int main(int argc, char *argv[]) {
-	
-	//-------------------------------------------------------------variables-------------------------------------------------------------------------
-	//int i;
-  float GPURuntimes[4];
-	//===============================================================================================================================================
-	
-	//--------------------------------------------------Input Parameter error chec-------------------------------------------------------------------
-	switch (argc){
-		case 3 : hp.CellSize=8; 			hp.BlockSize=2; 			hp.BlockOverlap=1; 					  hp.NumBins=9; 			hp.Orientation=0; 			  break;
-		case 4 : hp.CellSize=atoi(argv[3]); hp.BlockSize=2; 			hp.BlockOverlap=1; 			   		  hp.NumBins=9; 			hp.Orientation=0; 			  break;
-		case 5 : hp.CellSize=atoi(argv[3]); hp.BlockSize=atoi(argv[4]); hp.BlockOverlap=ceil(hp.BlockSize/2); hp.NumBins=9; 			hp.Orientation=0; 			  break;
-		case 6 : hp.CellSize=atoi(argv[3]); hp.BlockSize=atoi(argv[4]); hp.BlockOverlap=atoi(argv[5]); 		  hp.NumBins=9; 			hp.Orientation=0; 			  break;
-		case 7 : hp.CellSize=atoi(argv[3]); hp.BlockSize=atoi(argv[4]); hp.BlockOverlap=atoi(argv[5]); 		  hp.NumBins=atoi(argv[6]); hp.Orientation=0; 			  break;
-		case 8 : hp.CellSize=atoi(argv[3]); hp.BlockSize=atoi(argv[4]); hp.BlockOverlap=atoi(argv[5]); 		  hp.NumBins=atoi(argv[6]); hp.Orientation=atoi(argv[7]); break;
-		default: printf("\n\nUsage: hogfeature <inputimage> <output image> <Cell Size> <Block Size> <Block Overlap> <Number of Bins> <Orintation>");
-		printf("\n\nExample: hogfeature infilename.bmp outname.bmp 8 2 1 9 0\n");
-		printf("\nNumber of input parameters must be between 2 and 7\n");
-		return 0;
-	}
-	
-	if(hp.CellSize<2 | hp.CellSize> 32) {
-		printf("\n\nCellSize = %d is invalid",hp.CellSize);
-		printf("\n Cell Size can be an integer between 2 and 32\n");
-		exit(EXIT_FAILURE);
-	}
-	
-	if(hp.BlockSize<0 | hp.BlockSize> 8) {
-		printf("\n\nBlockSize = %d is invalid",hp.BlockSize);
-		printf("\n Block Size can be an integer between 1 and 8\n");
-		exit(EXIT_FAILURE);
-	}
 
-	if(hp.BlockOverlap<0 | hp.BlockOverlap> hp.BlockSize-1) {
-		printf("\n\nBlockSize = %d is invalid",hp.BlockOverlap);
-		printf("\n Block overlap can be an integer between 0 and %d\n",hp.BlockSize-1);
-		exit(EXIT_FAILURE);
-	}
+//FUNCTIONS =====================
+int hog_feature_pull(char *str_image, int d1_flag ) {
 	
-	if(hp.NumBins<4 | hp.NumBins> 180) {
-		printf("\n\nNumBins = %d is invalid",hp.NumBins);
-		printf("\nNumber of bins can be an integer between 0 and 180\n");
-		exit(EXIT_FAILURE);
-	}
-	
-	if(hp.Orientation<0 | hp.Orientation>1) {
-		printf("\n\nOrientation = %d is invalid",hp.Orientation);
-		printf("\n Orientation can be either 0 or 1\n");
-		exit(EXIT_FAILURE);
-	}
- 
-  printf("\n\nPARAMETERS:\n\n");
-  printf("CellSize=%d, BlockSize=%d, BlockOverlap=%d, NumBins=%d, Orientation=%d\n",hp.CellSize,hp.BlockSize,hp.BlockOverlap,hp.NumBins,hp.Orientation);
-	//===============================================================================================================================================
+    // Position for CUDA Streams 
+    float GPURuntimes[4];
 
-	//----------------------------------------------------------------Load Image---------------------------------------------------------------------
-	Mat image;	// see http://docs.opencv.org/modules/core/doc/basic_structures.html#mat
-	image = imread(argv[1], CV_LOAD_IMAGE_GRAYSCALE); //Load Grayscale image
+    //hard code Hog feature parameters 
+    hp.CellSize=8; 
+    hp.BlockSize=2;
+    hp.BlockOverlap=1; 
+    hp.NumBins=9; 
+    hp.Orientation=0; 	
 	
+	//------------Load Image-----------------------
+	Mat image;	
+	image = imread(str_image, CV_LOAD_IMAGE_GRAYSCALE); 
 	if(! image.data ) {
 		fprintf(stderr, "Could not open or find the image.\n");
 		exit(EXIT_FAILURE);
 	}
-	printf("Loaded image '%s', size = %dx%d (dims = %d).\n\n", argv[1], image.rows, image.cols, image.dims);
-	hp.ImgRow=image.rows;
-	hp.ImgCol=image.cols;
-  hp.ImgSize=hp.ImgRow*hp.ImgCol;
-  hp.CellRow=floor(image.rows/hp.CellSize);
-  hp.CellCol=floor(image.cols/hp.CellSize);
-  hp.TotalCells=hp.CellRow*hp.CellCol;
-	hp.BlockRow=(hp.CellRow-hp.BlockSize+1)/(hp.BlockSize-hp.BlockOverlap);
-  hp.BlockCol=(hp.CellCol-hp.BlockSize+1)/(hp.BlockSize-hp.BlockOverlap);
-  hp.TotalBlocks=hp.BlockRow*hp.BlockCol;
-  hp.FeatureSize=hp.NumBins*hp.BlockSize*hp.BlockSize;
-  printf("----------------------------------IMAGE DIVIDED INTO CELL HISTOGRAM----------------\n");
-  printf("\nCell_rows = %d, Cell_columns = %d, Total_cells = %d\n",hp.CellRow,hp.CellCol,hp.TotalCells);
-	printf("\nBlock_rows = %d, Block_columns = %d, Total_blocks = %d\n",hp.BlockRow,hp.BlockCol,hp.TotalBlocks);
-  printf("\nfeaturesize=%d\n",hp.FeatureSize);
-  printf("-----------------------------------------------------------------------------------\n\n");
-  
-  dp.ImgRow=hp.ImgRow;
-  dp.ImgCol=hp.ImgCol;
-  dp.ImgSize=hp.ImgSize;
-  dp.CellRow=32;
-  dp.CellSize=dp.ImgRow/dp.CellRow;
-  dp.CellCol=dp.ImgCol/dp.CellSize;
-  dp.TotalCells=dp.CellRow*dp.CellCol;
-  dp.NumBins=4;
-  dp.HorzCellsTotal=dp.CellSize*dp.TotalCells;
-  dp.HorzCells=dp.CellSize*dp.CellRow;
-  
-  dp.DisplayCellSize=17;
-  dp.DisplayImgRow=dp.DisplayCellSize*dp.CellRow;
-  dp.DisplayImgCol=dp.DisplayCellSize*dp.CellCol;
-  dp.DisplayImgSize=dp.DisplayImgCol*dp.DisplayImgRow;
-  printf("----------------------IMAGE DIVIDED INTO CELL HISTOGRAM FOR DISPLAYING-------------\n");
-  printf("\nCell_rows = %d, Cell_columns = %d, Total_cells=%d, Cell_size=%d, Horz_cells=%d\n",dp.CellRow,dp.CellCol,dp.TotalCells,dp.CellSize,dp.HorzCells);
-  printf("\nDisplay_rows = %d, Display_columns = %d, Total_pixels=%d, Cell_size=%d\n",dp.DisplayImgRow,dp.DisplayImgCol,dp.DisplayImgSize,dp.DisplayCellSize);
-  printf("-----------------------------------------------------------------------------------\n\n");
-  //===============================================================================================================================================	
 
-	//---------------------------------------------------Create CPU memory to store the output-------------------------------------------------------
+    printf("Loaded image '%s', size = %dx%d (dims = %d).\n\n", str_image, image.rows, image.cols, image.dims);
+    hp.ImgRow=image.rows;
+    hp.ImgCol=image.cols;
+    hp.ImgSize=hp.ImgRow*hp.ImgCol;
+    hp.CellRow=floor(image.rows/hp.CellSize);
+    hp.CellCol=floor(image.cols/hp.CellSize);
+    hp.TotalCells=hp.CellRow*hp.CellCol;
+    hp.BlockRow=(hp.CellRow-hp.BlockSize+1)/(hp.BlockSize-hp.BlockOverlap);
+    hp.BlockCol=(hp.CellCol-hp.BlockSize+1)/(hp.BlockSize-hp.BlockOverlap);
+    hp.TotalBlocks=hp.BlockRow*hp.BlockCol;
+    hp.FeatureSize=hp.NumBins*hp.BlockSize*hp.BlockSize;
+    printf("---------------------------------IMAGE DIVIDED INTO CELL HISTOGRAM----------------\n");
+    printf("\nCell_rows = %d, Cell_columns = %d, Total_cells = %d\n",hp.CellRow,hp.CellCol,hp.TotalCells);
+    printf("\nBlock_rows = %d, Block_columns = %d, Total_blocks = %d\n",hp.BlockRow,hp.BlockCol,hp.TotalBlocks);
+    printf("\nfeaturesize=%d\n",hp.FeatureSize);
+    printf("------------------------------------------\n\n");
+    if(d1_flag == 1){
+        dp.ImgRow=hp.ImgRow;
+        dp.ImgCol=hp.ImgCol;
+        dp.ImgSize=hp.ImgSize;
+        dp.CellRow=32;
+        dp.CellSize=dp.ImgRow/dp.CellRow;
+        dp.CellCol=dp.ImgCol/dp.CellSize;
+        dp.TotalCells=dp.CellRow*dp.CellCol;
+        dp.NumBins=4;
+        dp.HorzCellsTotal=dp.CellSize*dp.TotalCells;
+        dp.HorzCells=dp.CellSize*dp.CellRow;
+
+        dp.DisplayCellSize=17;
+        dp.DisplayImgRow=dp.DisplayCellSize*dp.CellRow;
+        dp.DisplayImgCol=dp.DisplayCellSize*dp.CellCol;
+        dp.DisplayImgSize=dp.DisplayImgCol*dp.DisplayImgRow;
+        printf("----------------------IMAGE DIVIDED INTO CELL HISTOGRAM FOR DISPLAYING-------------\n");
+        printf("\nCell_rows = %d, Cell_columns = %d, Total_cells=%d, Cell_size=%d, Horz_cells=%d\n",dp.CellRow,dp.CellCol,dp.TotalCells,dp.CellSize,dp.HorzCells);
+        printf("\nDisplay_rows = %d, Display_columns = %d, Total_pixels=%d, Cell_size=%d\n",dp.DisplayImgRow,dp.DisplayImgCol,dp.DisplayImgSize,dp.DisplayCellSize);
+        printf("----------------------------------------\n\n");
+    }
+  
+
+
+	//---Create CPU memory to store the output----------------
 	
-  checkCuda(cudaMallocHost ((void**)&CPU_InputArray,hp.ImgSize));
-  checkCuda(cudaMallocHost ((void**)&CPU_OutputArray,dp.DisplayImgSize));	
-  checkCuda(cudaMallocHost ((void**)&CPU_Hist,dp.TotalCells *4*4));	
+    checkCuda(cudaMallocHost ((void**)&CPU_InputArray,hp.ImgSize));
+    if(d1_flag == 1){
+        checkCuda(cudaMallocHost ((void**)&CPU_OutputArray,dp.DisplayImgSize));	
+        checkCuda(cudaMallocHost ((void**)&CPU_Hist,dp.TotalCells *4*4));	
+    }
+    checkCuda(cudaMallocHost ((void**)&CPU_FeatureArray,hp.TotalBlocks*sizeof(float)*hp.FeatureSize));	
 
-  checkCuda(cudaMallocHost ((void**)&CPU_FeatureArray,hp.TotalBlocks*sizeof(float)*hp.FeatureSize));	
+    memcpy(CPU_InputArray,image.data,hp.ImgSize);
+
+    //Launch CUDA Code 
+    checkCuda(launch_helper(GPURuntimes, d1_flag));
   
-  memcpy(CPU_InputArray,image.data,hp.ImgSize);
+    printf("-----------------------------------------------------------------\n");
+    printf("Tfr CPU->GPU = %5.2f ms ... \nExecution = %5.2f ms ... \nTfr GPU->CPU = %5.2f ms   \n Total=%5.2f ms\n",
+            GPURuntimes[1], GPURuntimes[2], GPURuntimes[3], GPURuntimes[0]);
+    printf("-----------------------------------------------------------------\n");
+
+    if(d1_flag == 1){
+        if (!imwrite("output_image.jpg", Mat(dp.DisplayImgRow, dp.DisplayImgCol, CV_8UC1, CPU_OutputArray))) {
+            fprintf(stderr, "couldn't write output to disk!\n");
+            cudaFreeHost(CPU_OutputArray);
+            cudaFreeHost(CPU_InputArray);
+            cudaFreeHost(CPU_FeatureArray);
+            exit(EXIT_FAILURE);
+        }
+    }
+    //Write Data 
+    //DATA_FeatureMatrix = WriteNumbers_data(CPU_FeatureArray,hp.BlockRow,hp.BlockCol,hp.FeatureSize)
  
-  checkCuda(launch_helper(GPURuntimes));
-  
-	printf("-----------------------------------------------------------------\n");
-	printf("Tfr CPU->GPU = %5.2f ms ... \nExecution = %5.2f ms ... \nTfr GPU->CPU = %5.2f ms   \n Total=%5.2f ms\n",
-			GPURuntimes[1], GPURuntimes[2], GPURuntimes[3], GPURuntimes[0]);
-	printf("-----------------------------------------------------------------\n");
-
-  if (!imwrite(argv[2], Mat(dp.DisplayImgRow, dp.DisplayImgCol, CV_8UC1, CPU_OutputArray))) {
-		fprintf(stderr, "couldn't write output to disk!\n");
-		cudaFreeHost(CPU_OutputArray);
+    WriteNumbers((char *)"Feature.txt",CPU_FeatureArray,hp.BlockRow,hp.BlockCol,hp.FeatureSize);
+    if(d1_flag == 1){
+        WriteNumbers((char *)"Display_feature.txt",CPU_Hist,dp.CellRow,dp.CellCol,4);
+    }
+    cudaFreeHost(CPU_OutputArray);
     cudaFreeHost(CPU_InputArray);
-	  cudaFreeHost(CPU_FeatureArray);
-		exit(EXIT_FAILURE);
-	}
- 
-  WriteNumbers("Feature.txt",CPU_FeatureArray,hp.BlockRow,hp.BlockCol,hp.FeatureSize);
-  WriteNumbers("Display_feature.txt",CPU_Hist,dp.CellRow,dp.CellCol,4);
- 
-  cudaFreeHost(CPU_OutputArray);
-  cudaFreeHost(CPU_InputArray);
-  cudaFreeHost(CPU_Hist);	
-	cudaFreeHost(CPU_FeatureArray);
-  printf("\n\n...EXECUTION COMPLETED...\n\n");
-  exit(EXIT_SUCCESS);
+    cudaFreeHost(CPU_Hist);	
+    cudaFreeHost(CPU_FeatureArray);
+    printf("\n\n...EXECUTION COMPLETED...\n\n");
+    exit(EXIT_SUCCESS);
+
 }
 
-cudaError_t launch_helper(float* Runtimes)
+cudaError_t launch_helper(float* Runtimes, int d1_flag)
 {
-	cudaEvent_t time1, time2, time3, time4;
+    cudaEvent_t time1, time2, time3, time4;
 
-  int   *Orientation;
-	float *Gradient;
-  uchar *DisplayOrientation;
-	uchar *GPU_idata;
-	uchar *GPU_odata;
- 	//uchar *GPU_displaydata;
-  float *GPU_CellHistogram;
-  float *GPU_BlockHistogram;
-  float *TempDisplayhistogram;
-  float *Displayhistogram;
-  dim3 threadsPerBlock;
-	dim3 numBlocks;
-  int i;
+    int   *Orientation;
+    float *Gradient;
+    uchar *DisplayOrientation;
+    uchar *GPU_idata;
+    uchar *GPU_odata;
+    //uchar *GPU_displaydata;
+    float *GPU_CellHistogram;
+    float *GPU_BlockHistogram;
+    float *TempDisplayhistogram;
+    float *Displayhistogram;
+    dim3 threadsPerBlock;
+    dim3 numBlocks;
+    int i;
   
-  cudaError_t cudaStatus;
-	cudaStatus = cudaSetDevice(0);  
-	if (cudaStatus != cudaSuccess) {
-		fprintf(stderr, "cudaSetDevice failed!  Do you have a CUDA-capable GPU installed?\n");
-		goto Error;
-	}
+    cudaError_t cudaStatus;
+    cudaStatus = cudaSetDevice(0);  
+    if (cudaStatus != cudaSuccess) {
+        fprintf(stderr, "cudaSetDevice failed!  Do you have a CUDA-capable GPU installed?\n");
+        goto Error;
+    }
  
- 	cudaEventCreate(&time1);
-	cudaEventCreate(&time2);
-	cudaEventCreate(&time3);
-	cudaEventCreate(&time4);
+    cudaEventCreate(&time1);
+    cudaEventCreate(&time2);
+    cudaEventCreate(&time3);
+    cudaEventCreate(&time4);
  
- cudaEventRecord(time1, 0);
- 
- for(i=0;i<2;i++) checkCuda(cudaStreamCreate(&stream[i]));
- 
- checkCuda(cudaMalloc((void**)&GPU_idata, hp.ImgSize));
- checkCuda(cudaMalloc((void**)&Gradient, hp.ImgSize*4));
-	
- checkCuda(cudaMalloc((void**)&Orientation, hp.ImgSize*4));
- 
- 
- checkCuda(cudaMalloc((void**)&DisplayOrientation, hp.ImgSize));
- //checkCuda(cudaMalloc((void**)&GPU_displaydata, hp.ImgSize));
- //checkCuda(cudaMallocHost ((void**)&GPU_CellHistogram,hp.TotalCells*sizeof(float)*hp.NumBins));
+    cudaEventRecord(time1, 0);
 
- checkCuda(cudaMemcpyAsync(GPU_idata, CPU_InputArray, hp.ImgSize, cudaMemcpyHostToDevice,stream[0]));
- 
- cudaEventRecord(time2, 0);
- 
- threadsPerBlock = dim3(BOX_SIZE, BOX_SIZE);
- numBlocks = dim3((int)ceil(hp.ImgRow / (float)threadsPerBlock.x), (int)ceil(hp.ImgCol / (float)threadsPerBlock.y));
- Cal_kernel<<<numBlocks, threadsPerBlock,0,stream[0]>>>(GPU_idata,Orientation,Gradient,DisplayOrientation,hp);
- checkCuda(cudaDeviceSynchronize());
- cudaFree(GPU_idata);
- 
- //Launch Display Kernel
- 
- checkCuda(cudaMalloc((void**)&TempDisplayhistogram, dp.HorzCellsTotal*4*4));
- checkCuda(cudaMalloc((void**)&Displayhistogram, dp.TotalCells *4*4));  
- threadsPerBlock = dim3(BOX_SIZE, BOX_SIZE);
- numBlocks = dim3((int)ceil(dp.HorzCells / (float)threadsPerBlock.x), (int)ceil(dp.CellCol / (float)threadsPerBlock.y));
- Display_Cell_kernel<<<numBlocks, threadsPerBlock,0,stream[1]>>>(Displayhistogram,TempDisplayhistogram,DisplayOrientation,Gradient,dp);
- 
- checkCuda(cudaMallocHost ((void**)&GPU_CellHistogram,hp.TotalCells*sizeof(float)*hp.NumBins));
- threadsPerBlock = dim3(BOX_SIZE, BOX_SIZE);
- numBlocks = dim3((int)ceil(hp.CellRow / (float)threadsPerBlock.x), (int)ceil(hp.CellCol / (float)threadsPerBlock.y));
- //printf("\n\n...%d %d...\n\n",numBlocks.x,numBlocks.y); 
- Cell_kernel<<<numBlocks, threadsPerBlock,0,stream[0]>>>(GPU_CellHistogram,Orientation,Gradient,hp);
- 
- checkCuda(cudaDeviceSynchronize());
- 
- checkCuda(cudaMemcpy(CPU_Hist,Displayhistogram , dp.TotalCells *4*4, cudaMemcpyDeviceToHost));
- 
-  
- cudaFree(TempDisplayhistogram);
- cudaFree(Orientation); cudaFree(Gradient);
- checkCuda(cudaMalloc((void**)&GPU_odata, dp.DisplayImgSize));
- cudaMemset(GPU_odata, 0, dp.DisplayImgSize);
- threadsPerBlock = dim3(4, 4, 4);
- numBlocks = dim3((int)ceil(dp.CellRow / (float)threadsPerBlock.x), (int)ceil(dp.CellCol / (float)threadsPerBlock.y));
- //printf("\n\n...%d %d...\n\n",numBlocks.x,numBlocks.y); 
- display_kernel<<<numBlocks, threadsPerBlock,0,stream[1]>>>(Displayhistogram,GPU_odata,dp);
- 
- 
- checkCuda(cudaMallocHost ((void**)&GPU_BlockHistogram,hp.TotalBlocks*sizeof(float)*hp.FeatureSize));
- threadsPerBlock = dim3(BOX_SIZE, BOX_SIZE);
- numBlocks = dim3((int)ceil(hp.BlockRow / (float)threadsPerBlock.x), (int)ceil(hp.BlockCol / (float)threadsPerBlock.y));
- //printf("\n\n...%d %d...\n\n",numBlocks.x,numBlocks.y); 
- Block_kernel<<<numBlocks, threadsPerBlock,0,stream[0]>>>(GPU_BlockHistogram, GPU_CellHistogram, hp);
- 
- cudaEventRecord(time3, 0);
- 
- checkCuda(cudaMemcpyAsync(CPU_OutputArray, GPU_odata, dp.DisplayImgSize, cudaMemcpyDeviceToHost,stream[1]));
- checkCuda(cudaDeviceSynchronize());
- 
- //checkCuda(cudaMemcpy(CPU_CellArray,GPU_CellHistogram , hp.TotalCells*sizeof(float)*hp.NumBins, cudaMemcpyDeviceToHost));
- 
- checkCuda(cudaMemcpy(CPU_FeatureArray,GPU_BlockHistogram , hp.TotalBlocks*sizeof(float)*hp.FeatureSize, cudaMemcpyDeviceToHost));
- 
- 	cudaEventRecord(time4, 0);
-	cudaEventSynchronize(time1);
-	cudaEventSynchronize(time2);
-	cudaEventSynchronize(time3);
-	cudaEventSynchronize(time4);
+    for(i=0;i<2;i++) checkCuda(cudaStreamCreate(&stream[i]));
 
-	float totalTime, tfrCPUtoGPU, tfrGPUtoCPU, kernelExecutionTime;
+    checkCuda(cudaMalloc((void**)&GPU_idata, hp.ImgSize));
+    checkCuda(cudaMalloc((void**)&Gradient, hp.ImgSize*4));
 
-	cudaEventElapsedTime(&totalTime, time1, time4);
-	cudaEventElapsedTime(&tfrCPUtoGPU, time1, time2);
-	cudaEventElapsedTime(&kernelExecutionTime, time2, time3);
-	cudaEventElapsedTime(&tfrGPUtoCPU, time3, time4);
+    checkCuda(cudaMalloc((void**)&Orientation, hp.ImgSize*4));
 
-	Runtimes[0] = totalTime;
-	Runtimes[1] = tfrCPUtoGPU;
-	Runtimes[2] = kernelExecutionTime;
-	Runtimes[3] = tfrGPUtoCPU;
+
+    checkCuda(cudaMalloc((void**)&DisplayOrientation, hp.ImgSize));
+
+    checkCuda(cudaMemcpyAsync(GPU_idata, CPU_InputArray, hp.ImgSize, cudaMemcpyHostToDevice,stream[0]));
+
+    cudaEventRecord(time2, 0);
+
+    threadsPerBlock = dim3(BOX_SIZE, BOX_SIZE);
+    numBlocks = dim3((int)ceil(hp.ImgRow / (float)threadsPerBlock.x), (int)ceil(hp.ImgCol / (float)threadsPerBlock.y));
+    Cal_kernel<<<numBlocks, threadsPerBlock,0,stream[0]>>>(GPU_idata,Orientation,Gradient,DisplayOrientation,hp);
+    checkCuda(cudaDeviceSynchronize());
+    cudaFree(GPU_idata);
  
- 	Error:
-  for(i=0;i<2;i++) cudaStreamDestroy(stream[i]);
-	cudaFree(GPU_odata);
-	cudaFree(GPU_idata);
-  cudaFree(Orientation);
-  cudaFree(Gradient);
-  cudaFree(GPU_CellHistogram);
-  cudaFree(GPU_BlockHistogram);
-	cudaFree(Displayhistogram);
-  cudaFree(TempDisplayhistogram);
- 	cudaEventDestroy(time1);
-	cudaEventDestroy(time2);
-	cudaEventDestroy(time3);
-	cudaEventDestroy(time4);
+    //Launch Display Kernel
+    if(d1_flag == 1){
+      checkCuda(cudaMalloc((void**)&TempDisplayhistogram, dp.HorzCellsTotal*4*4));
+      checkCuda(cudaMalloc((void**)&Displayhistogram, dp.TotalCells *4*4));  
+      threadsPerBlock = dim3(BOX_SIZE, BOX_SIZE);
+      numBlocks = dim3((int)ceil(dp.HorzCells / (float)threadsPerBlock.x), (int)ceil(dp.CellCol / (float)threadsPerBlock.y));
+      Display_Cell_kernel<<<numBlocks, threadsPerBlock,0,stream[1]>>>(Displayhistogram,TempDisplayhistogram,DisplayOrientation,Gradient,dp);
+    }
+
+    checkCuda(cudaMallocHost ((void**)&GPU_CellHistogram,hp.TotalCells*sizeof(float)*hp.NumBins));
+    threadsPerBlock = dim3(BOX_SIZE, BOX_SIZE);
+    numBlocks = dim3((int)ceil(hp.CellRow / (float)threadsPerBlock.x), (int)ceil(hp.CellCol / (float)threadsPerBlock.y));
+    //printf("\n\n...%d %d...\n\n",numBlocks.x,numBlocks.y); 
+    Cell_kernel<<<numBlocks, threadsPerBlock,0,stream[0]>>>(GPU_CellHistogram,Orientation,Gradient,hp);
+
+    checkCuda(cudaDeviceSynchronize());
+    if(d1_flag == 1){
+      checkCuda(cudaMemcpy(CPU_Hist,Displayhistogram , dp.TotalCells *4*4, cudaMemcpyDeviceToHost));
+
+
+      cudaFree(TempDisplayhistogram);
+      cudaFree(Orientation); cudaFree(Gradient);
+      checkCuda(cudaMalloc((void**)&GPU_odata, dp.DisplayImgSize));
+      cudaMemset(GPU_odata, 0, dp.DisplayImgSize);
+      threadsPerBlock = dim3(4, 4, 4);
+      numBlocks = dim3((int)ceil(dp.CellRow / (float)threadsPerBlock.x), (int)ceil(dp.CellCol / (float)threadsPerBlock.y));
+      //printf("\n\n...%d %d...\n\n",numBlocks.x,numBlocks.y); 
+      display_kernel<<<numBlocks, threadsPerBlock,0,stream[1]>>>(Displayhistogram,GPU_odata,dp);
+    }
+
+    checkCuda(cudaMallocHost ((void**)&GPU_BlockHistogram,hp.TotalBlocks*sizeof(float)*hp.FeatureSize));
+    threadsPerBlock = dim3(BOX_SIZE, BOX_SIZE);
+    numBlocks = dim3((int)ceil(hp.BlockRow / (float)threadsPerBlock.x), (int)ceil(hp.BlockCol / (float)threadsPerBlock.y));
+    //printf("\n\n...%d %d...\n\n",numBlocks.x,numBlocks.y); 
+    Block_kernel<<<numBlocks, threadsPerBlock,0,stream[0]>>>(GPU_BlockHistogram, GPU_CellHistogram, hp);
+
+    cudaEventRecord(time3, 0);
+
+    if(d1_flag==1){
+      checkCuda(cudaMemcpyAsync(CPU_OutputArray, GPU_odata, dp.DisplayImgSize, cudaMemcpyDeviceToHost,stream[1]));
+      checkCuda(cudaDeviceSynchronize());
+    }
+
+    //checkCuda(cudaMemcpy(CPU_CellArray,GPU_CellHistogram ,
+    // hp.TotalCells*sizeof(float)*hp.NumBins, cudaMemcpyDeviceToHost));
+
+    checkCuda(cudaMemcpy(CPU_FeatureArray,GPU_BlockHistogram , hp.TotalBlocks*sizeof(float)*hp.FeatureSize, cudaMemcpyDeviceToHost));
  
-  return cudaStatus;
+    cudaEventRecord(time4, 0);
+    cudaEventSynchronize(time1);
+    cudaEventSynchronize(time2);
+    cudaEventSynchronize(time3);
+    cudaEventSynchronize(time4);
+
+    float totalTime, tfrCPUtoGPU, tfrGPUtoCPU, kernelExecutionTime;
+
+    cudaEventElapsedTime(&totalTime, time1, time4);
+    cudaEventElapsedTime(&tfrCPUtoGPU, time1, time2);
+    cudaEventElapsedTime(&kernelExecutionTime, time2, time3);
+    cudaEventElapsedTime(&tfrGPUtoCPU, time3, time4);
+
+    Runtimes[0] = totalTime;
+    Runtimes[1] = tfrCPUtoGPU;
+    Runtimes[2] = kernelExecutionTime;
+    Runtimes[3] = tfrGPUtoCPU;
+
+    Error:
+    for(i=0;i<2;i++) cudaStreamDestroy(stream[i]);
+    cudaFree(GPU_odata);
+    cudaFree(GPU_idata);
+    cudaFree(Orientation);
+    cudaFree(Gradient);
+    cudaFree(GPU_CellHistogram);
+    cudaFree(GPU_BlockHistogram);
+    cudaFree(Displayhistogram);
+    cudaFree(TempDisplayhistogram);
+    cudaEventDestroy(time1);
+    cudaEventDestroy(time2);
+    cudaEventDestroy(time3);
+    cudaEventDestroy(time4);
+
+    return cudaStatus;
+}
+
+int main(int argc, char *argv[]) {
+    //
+    //hog_feature_pull(Mat image)
+    //  image : image/data from cv::Mat
+    //
+    //Mat image = argv[1];
+    int d1_flag = atoi(argv[2]);
+    int ax = hog_feature_pull(argv[1], d1_flag) ;
+    return 0;
 }
