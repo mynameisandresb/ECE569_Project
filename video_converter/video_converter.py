@@ -9,7 +9,7 @@ if not os.path.exists(output_dir):
     os.mkdir(output_dir)
 
 # Reads in the video
-cap = cv2.VideoCapture('./IMG_0179.MOV')
+cap = cv2.VideoCapture('./logo_video.mp4')
 
 # Captures first frame
 success,image = cap.read()
