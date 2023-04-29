@@ -299,7 +299,7 @@ void test_cuda(){
   char buff2[100];
 
   int i = 2;
-  std::string input_file = "../../video_converter/data/in000001.jpg";
+  std::string input_file = "../video_converter/data/in000001.jpg";
 
   frame = readImage(input_file);
   if(!frame.isContinuous()){
@@ -384,7 +384,7 @@ void test_cuda(){
 
   // Initialize a GPU timer based on events
   GpuTimer timer;
-  cv::Ptr<cv::ml::SVM> svm = cv::ml::SVM::load("/home/andres/ECE569_Project/HOG-Feature/svm.yml");
+  cv::Ptr<cv::ml::SVM> svm = cv::ml::SVM::load("../HOG-Feature/svm.yml");
   while(i < 500){
 
     //BLURRING
@@ -497,7 +497,7 @@ void test_cuda(){
     t_parallel += t_parallel_f - t_parallel_s;
 
     // Load image color
-    sprintf(buff2, "../../video_converter/data/in%06d.jpg", i);
+    sprintf(buff2, "../video_converter/data/in%06d.jpg", i);
     cv::Mat frame_color = cv::imread(buff2);
 
   
@@ -518,7 +518,7 @@ void test_cuda(){
       if(bounding_boxes.size() == 1){
         type = 0;
       }
-      sprintf(buff2, "../../video_converter/out/out_%d_%06d.yml", type, i);
+      sprintf(buff2, "../video_converter/out/out_%d_%06d.yml", type, i);
       std::string filename = buff2;
 
       timer.Start();
@@ -550,10 +550,10 @@ void test_cuda(){
                     2);
       }
       
-      // sprintf(buff2, "../../video_converter/out/out_%d_%06d.jpg", prediction_int, i);
+      // sprintf(buff2, "../video_converter/out/out_%d_%06d.jpg", prediction_int, i);
       // cv::imwrite(buff2, bounding_boxes[w].image);
     }
-    sprintf(buff2, "../../video_converter/out/out_%06d.jpg", i);
+    sprintf(buff2, "../video_converter/out/out_%06d.jpg", i);
     cv::imwrite(buff2, frame_color);
     // cv::imshow("result", temp);
     //cvWaitKey(1);
@@ -562,7 +562,7 @@ void test_cuda(){
     cleanup();
 
     // get the next frame
-    sprintf(buff, "../../video_converter/data/in%06d.jpg", i++);
+    sprintf(buff, "../video_converter/data/in%06d.jpg", i++);
     std::string buffAsStdStr = buff;
     const char *c = buffAsStdStr.c_str();
     frame = readImage(c);
