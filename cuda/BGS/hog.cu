@@ -1,8 +1,8 @@
-//###################################################################################################################################################
-//------------------------------------------------------------HOG-Feature Section--------------------------------------------------------------------------
-//###################################################################################################################################################
-
-//------------------------------------------------------------Includes--------------------------------------------------------------------------
+/*
+* Code:     hog.cpp 4/25/23
+* Purpose:  
+*   The HOG Feature Kernel code to support the cuda/bin/BGS executable 
+*/
 #include <stdio.h>
 #include <assert.h>
 #include <stdio.h>
@@ -19,7 +19,9 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
-
+/*
+Struct containing the HOG properties 
+*/
 struct HogProp
 {
 	int ImgRow,ImgCol;
@@ -67,12 +69,11 @@ using namespace cv;
 int Cal_kernel_v;
 int Cell_kernel_v;
 int Block_kernel_v;
-//int Display_Cell_kernel_v;
-//int display_kernel_v;
+
 
 //-------------------------------------------------------------Cal_kernel-------------------------------------------------------------------------
 
-// Cal_kernel Original Version 0
+// Basecode Cal_kernel Original Version 0
 __global__ void Cal_kernel_v0(uchar *GPU_i, int *Orientation,float *Gradient, uchar *DisplayOrientation, HogProp hp){
  	int i = blockIdx.x * blockDim.x + threadIdx.x;  // row of image
 	int j = blockIdx.y * blockDim.y + threadIdx.y;  // col of image
@@ -109,7 +110,6 @@ __global__ void Cal_kernel_v0(uchar *GPU_i, int *Orientation,float *Gradient, uc
      else ang=(hp.NumBins)*ang/(2*PI);
      
      Orientation[idx]=(int)ang;
-     //GPU_o[idx] = (uchar) (DisplayOrientation[idx]);
   }
 }
 
@@ -177,6 +177,10 @@ __global__ void Cal_kernel_v1(uchar *GPU_i, int *Orientation,float *Gradient, uc
 }
 
 // Cal_kernel Optimized Version 2
+// Some execution time performance gains seen
+// Added usage of shared memory
+// Pixels are loaded into shared memory and syncthreads() performed to confirm completenes on thread block. 
+// And variables are not initialized until fall within boundary branch
 __global__ void Cal_kernel_v2(uchar *GPU_i, int *Orientation,float *Gradient, uchar *DisplayOrientation, HogProp hp){
   __shared__ uchar i_shared[BOX_SIZE+2][BOX_SIZE+2];
   
@@ -251,7 +255,7 @@ __global__ void Cal_kernel_v2(uchar *GPU_i, int *Orientation,float *Gradient, uc
 
 //-------------------------------------------------------------Cell_kernel-------------------------------------------------------------------------
 
-// Cell_kernel Original Version 0
+// Base code Cell_kernel Original Version 0
 __global__ void Cell_kernel_v0(float *histogram, int *Orientation, float *Gradient, HogProp hp){
  	int i = blockIdx.x * blockDim.x + threadIdx.x;  // row of image
 	int j = blockIdx.y * blockDim.y + threadIdx.y;  // col of image
@@ -352,7 +356,14 @@ __global__ void Cell_kernel_v2(float *histogram, int *Orientation,float *Gradien
 }
 
 
-//
+// Cell_kernel Optimized Version 4
+// Saw significant improvment on execution time performance compared to original version 0
+// Version 4 uses shared memory and to hold partial histograms
+// Then atomicAdd to accumulate into the histogram in shared memory
+// Then goes through the shared memory histogram to updates the global memory
+// This method allows for a more controlled approach when adding information to the cell Histogram. 
+//  By using Shared Memory instead of directly to global, help with latency issues 
+//  By using the atomic Operations   
 __global__ void Cell_kernel_v4(float *histogram, int *Orientation,float *Gradient, HogProp hp){
   // Calculate row, column, and cell indices for the current thread
 // Calculate row, column, and cell indices for the current thread
@@ -379,7 +390,7 @@ __global__ void Cell_kernel_v4(float *histogram, int *Orientation,float *Gradien
     int img_i = i * hp.CellSize + cell_i;
     int img_j = j * hp.CellSize + cell_j;
 
-    // Calculate the linear indices for the image and the cell histogram
+    // Calculate the index's for the image and the cell histogram
     int img_idx = img_i * hp.ImgCol + img_j;
     int cell_idx = i * hp.CellCol * hp.NumBins + j * hp.NumBins;
 
