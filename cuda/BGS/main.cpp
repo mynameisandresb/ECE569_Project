@@ -108,12 +108,12 @@ void median_filter_opt(unsigned char* d_frame,
                      unsigned char* d_blurred,
                      size_t numRows, size_t numCols);
 
-void test_cuda();
+void test_cuda(int fast);
 
 /*
 HOG-Feature
 */
-cv::Mat hogFeature(cv::Mat image, std::string filename);
+cv::Mat hogFeature(cv::Mat image, std::string filename, int fast);
 
 
 //include the definitions of the above functions for the kernel calls
@@ -132,8 +132,11 @@ double cpu_timer(void)
 
 int main(int argc, char *argv[]) 
 {
-
-  test_cuda();
+  int fast = 0;
+  if (argc > 2) {
+    fast = 1;
+  }
+  test_cuda(fast);
 
   return 0;
 }
@@ -248,7 +251,7 @@ std::vector<BoundingBox> getBoundingBoxes(cv::Mat &matImage, cv::Mat &colorImage
   return bounding_boxes;
 }
 
-void test_cuda(){
+void test_cuda(int fast){
   /*
   * Timing variables
   */
@@ -423,14 +426,21 @@ void test_cuda(){
         //                 d_frame_blurred,
         //                 numRows(), numCols());
 
-
-        gaussian_and_median_blur_opt(d_frame_to_blur,
-                        d_frame_blurred,
-                        d_blurred_temp,
-                        d_gaussian_filter,
-                        BLUR_SIZE,
-                        numRows(), numCols());
-
+        if(fast){
+          gaussian_and_median_blur_opt(d_frame_to_blur,
+                          d_frame_blurred,
+                          d_blurred_temp,
+                          d_gaussian_filter,
+                          BLUR_SIZE,
+                          numRows(), numCols());
+        }else{
+          gaussian_and_median_blur(d_frame_to_blur,
+                          d_frame_blurred,
+                          d_blurred_temp,
+                          d_gaussian_filter,
+                          BLUR_SIZE,
+                          numRows(), numCols());
+        }
         timer.Stop();
         cudaDeviceSynchronize(); checkCudaErrors(cudaGetLastError());
 
@@ -469,13 +479,12 @@ void test_cuda(){
     */
     timer.Start();
 
-    // CALL DSGM
-    #if OPTIMIZED_BGS == 1
-    // CALL DSGM
+
+    if(fast){
       gaussian_background_opt(d_frame,d_amean,d_cmean,d_avar,d_cvar, d_bin, d_aage, d_cage, numRows(), numCols());
-    #else
+    }else{
       gaussian_background(d_frame,d_amean,d_cmean,d_avar,d_cvar, d_bin, d_aage, d_cage, numRows(), numCols());
-    #endif
+    }
 
     timer.Stop();
     cudaDeviceSynchronize(); checkCudaErrors(cudaGetLastError());
@@ -522,7 +531,11 @@ void test_cuda(){
       std::string filename = buff2;
 
       timer.Start();
-      hogFeatureOutputs[w] = hogFeature(bounding_boxes[w].image, filename);
+      if(fast){
+        hogFeatureOutputs[w] = hogFeature(bounding_boxes[w].image, filename, 1);
+      }else{
+        hogFeatureOutputs[w] = hogFeature(bounding_boxes[w].image, filename, 0);
+      }
       timer.Stop();
       t_hog += (timer.Elapsed()/1000);
 

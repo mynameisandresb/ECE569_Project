@@ -662,7 +662,7 @@ __global__ void display_kernel_v2(float *Displayhistogram, uchar *GPU_odata, Dis
 
 
 // hogFeature takes in Mat image and returns the Mat image of the HOG features extracted
-Mat hogFeature(Mat image, std::string filename){
+Mat hogFeature(Mat image, std::string filename, int fast){
 	
 	//-------------------------------------------------------------variables-------------------------------------------------------------------------
 	//int i;
@@ -683,9 +683,15 @@ Mat hogFeature(Mat image, std::string filename){
   hp.Orientation= 0; //atoi(argv[7]);
 
   // Using optimized kernels versions for performance set
-  Cal_kernel_v = 1; //atoi(argv[3]); 0 or 1 
-  Cell_kernel_v = 0; //atoi(argv[4]);
-  Block_kernel_v = 3; //atoi(argv[5]);
+  if(fast){
+    Cal_kernel_v = 1; //atoi(argv[3]); 0 or 1 
+    Cell_kernel_v = 0; //atoi(argv[4]);
+    Block_kernel_v = 3; //atoi(argv[5]);
+  }else{
+    Cal_kernel_v = 0; //atoi(argv[3]); 0 or 1 
+    Cell_kernel_v = 0; //atoi(argv[4]);
+    Block_kernel_v = 0; //atoi(argv[5]);
+  }
   //Display_Cell_kernel_v = 0; //atoi(argv[6]);
   //display_kernel_v = 0; //atoi(argv[7]);
 
