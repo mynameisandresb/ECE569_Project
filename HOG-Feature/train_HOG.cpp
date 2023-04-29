@@ -221,7 +221,7 @@ void load_actual_images( vector< Mat > & img_lst, bool showImages = false )
 {
     vector< String > files;
     cout << " whhaaa \n" << " \n";
-    glob( "/home/andres/ECE569_Project/video_converter/images", files );
+    glob( "../video_converter/images", files );
     cout << files.size() << " \n";
     for ( size_t i = 0; i < files.size(); ++i )
     {
@@ -284,8 +284,8 @@ int main( int argc, char** argv )
     }
 
     //hardcode 
-    pos_dir = "/home/andres/ECE569_Project/video_converter/1uofa";
-    neg_dir = "/home/andres/ECE569_Project/video_converter/1asu";
+    pos_dir = "../video_converter/1uofa";
+    neg_dir = "../video_converter/1asu";
 
     vector< Mat > pos_lst, full_neg_lst, gradient_lst;
     vector< int > labels;

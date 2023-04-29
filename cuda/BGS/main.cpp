@@ -384,7 +384,7 @@ void test_cuda(){
 
   // Initialize a GPU timer based on events
   GpuTimer timer;
-  cv::Ptr<cv::ml::SVM> svm = cv::ml::SVM::load("/home/andres/ECE569_Project/HOG-Feature/svm.yml");
+  cv::Ptr<cv::ml::SVM> svm = cv::ml::SVM::load("../../HOG-Feature/svm.yml");
   while(i < 500){
 
     //BLURRING
