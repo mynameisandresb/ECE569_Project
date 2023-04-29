@@ -125,6 +125,7 @@ void gaussian_filter_kernel_opt(unsigned char* d_frame,
 							const int d_filter_height,
 							const int numRows, const int numCols){
 
+  // Extract thread and block indices, and row and column indices
 	const int tx = threadIdx.x;
 	const int ty = threadIdx.y;
 	const int bx = blockIdx.x;
@@ -134,8 +135,10 @@ void gaussian_filter_kernel_opt(unsigned char* d_frame,
 	const int FILTER_WIDTH = d_filter_width;
 	const int FILTER_HEIGHT = d_filter_height;
 
+  // Initialize shared memory array to store input image data
 	__shared__ float s_data[THREAD_SIZE + 9 - 1][THREAD_SIZE + 9 - 1];
 
+  // Load input image data into shared memory
 	if(row < numRows && col < numCols){
 		s_data[ty][tx] = d_frame[row * numCols + col];
 	}
@@ -152,8 +155,10 @@ void gaussian_filter_kernel_opt(unsigned char* d_frame,
 		s_data[ty + THREAD_SIZE][tx + THREAD_SIZE] = d_frame[(row + THREAD_SIZE) * numCols + col + THREAD_SIZE];
 	}
 
+  // Wait for all threads in the block to finish loading data into shared memory
 	__syncthreads();
 
+  // Perform filter operation on input image data stored in shared memory
   float sum = 0.0f;
   #pragma unroll
   for (int i = 0; i < FILTER_HEIGHT; i++) {
@@ -164,6 +169,8 @@ void gaussian_filter_kernel_opt(unsigned char* d_frame,
         sum += current_pixel * d_gfilter[i * FILTER_WIDTH + j];
     }
   }
+
+  // Write filtered value to output image, but only for pixels that are not in boundary regions
 	if (row < (numRows - 7) && col < (numCols - 7)) {
 		d_blurred[row * numCols + col] = static_cast<int>(sum);
 	}
