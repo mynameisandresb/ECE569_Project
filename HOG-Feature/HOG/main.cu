@@ -135,6 +135,79 @@ __global__ void Cal_kernel_v1(uchar *GPU_i, int *Orientation,float *Gradient, uc
 
 }
 
+// Cal_kernel Optimized Version 2
+__global__ void Cal_kernel_v2(uchar *GPU_i, int *Orientation,float *Gradient, uchar *DisplayOrientation, HogProp hp){
+  __shared__ uchar i_shared[BOX_SIZE+2][BOX_SIZE+2];
+  
+  // get thread and block indices
+  int tx = threadIdx.x;
+  int ty = threadIdx.y;
+  int bx = blockIdx.x * blockDim.x;
+  int by = blockIdx.y * blockDim.y;
+  int i = bx + tx;  // row of image
+  int j = by + ty;  // col of image
+
+  // load pixels into shared memory
+  i_shared[ty+1][tx+1] = GPU_i[i*hp.ImgCol+j];
+  if (tx == 0) {
+    i_shared[ty+1][tx] = GPU_i[i*hp.ImgCol+j-1];
+  }
+  if (tx == blockDim.x-1) {
+    i_shared[ty+1][tx+2] = GPU_i[i*hp.ImgCol+j+1];
+  }
+  if (ty == 0) {
+    i_shared[ty][tx+1] = GPU_i[(i-1)*hp.ImgCol+j];
+  }
+  if (ty == blockDim.y-1) {
+    i_shared[ty+2][tx+1] = GPU_i[(i+1)*hp.ImgCol+j];
+  }
+  __syncthreads();
+
+  // compute gx and gy
+  float gx = (float)(i_shared[ty+1][tx]-i_shared[ty+1][tx+2]);
+  float gy = (float)(i_shared[ty][tx+1]-i_shared[ty+2][tx+1]);
+
+  // compute gradient and orientation
+  if(i>0 && i < hp.ImgRow-1 && j >0 && j < hp.ImgCol-1){
+    Gradient[i*hp.ImgCol+j] = sqrtf(gx*gx+gy*gy);
+    float ang = atan2f(gy,gx);
+    float displayang;
+  if(ang<0) {
+      displayang=8*(ang+PI);
+  }
+  else {
+      displayang=8*ang;
+  }
+  if(displayang<PI | displayang>7*PI) {
+      DisplayOrientation[i*hp.ImgCol+j]=0;
+  }
+  else if(displayang>=PI & displayang<3*PI) {
+      DisplayOrientation[i*hp.ImgCol+j]=1;
+  }
+  else if(displayang>=3*PI & displayang<5*PI) {
+      DisplayOrientation[i*hp.ImgCol+j]=2;
+  }
+  else {
+      DisplayOrientation[i*hp.ImgCol+j]=3;
+  }
+  if (ang<0) {
+    if(hp.Orientation==0) { 
+      ang = ang+ PI; 
+    }
+    else { 
+      ang = 2*PI+ang; 
+    }
+  }
+  if(hp.Orientation==0) {
+    ang=(hp.NumBins)*ang/PI;
+  }
+  else {
+    ang=(hp.NumBins)*ang/(2*PI);
+  }
+    Orientation[i*hp.ImgCol+j]=(int)ang;
+  }
+}
+
 //-------------------------------------------------------------Cell_kernel-------------------------------------------------------------------------
 
 // Cell_kernel Original Version 0
@@ -658,8 +731,12 @@ __global__ void display_kernel_v2(float *Displayhistogram, uchar *GPU_odata, Dis
 
 
 // hogFeature takes in Mat image and returns the Mat image of the HOG features extracted
-Mat hogFeature(Mat image){
-	
+Mat hogFeature(char *argv[]){
+  //----------------------------------------------------------------Load Image---------------------------------------------------------------------
+  Mat image;	// see http://docs.opencv.org/modules/core/doc/basic_structures.html#mat
+  const char* imageFile = "test.jpg";
+  image = imread(imageFile, CV_LOAD_IMAGE_GRAYSCALE); //Load Grayscale image argv[1]
+    
 	//-------------------------------------------------------------variables-------------------------------------------------------------------------
 	//int i;
   float GPURuntimes[4];
@@ -688,11 +765,11 @@ Mat hogFeature(Mat image){
   // hp.Orientation= 0; //atoi(argv[7]);
 
   // Using input arguments for collecting results comparison data for all of them
-  // Cal_kernel_v = atoi(argv[3]);
-  // Cell_kernel_v = atoi(argv[4]);
-  // Block_kernel_v = atoi(argv[5]);
-  // Display_Cell_kernel_v = atoi(argv[6]);
-  // display_kernel_v = atoi(argv[7]);
+  Cal_kernel_v = atoi(argv[1]);
+  Cell_kernel_v = atoi(argv[2]);
+  Block_kernel_v = atoi(argv[3]);
+  Display_Cell_kernel_v = atoi(argv[4]);
+  display_kernel_v = atoi(argv[5]);
 
   // Setting input parameters adjusted optimized performance set
   hp.CellSize= 8; //atoi(argv[3]); 
@@ -702,47 +779,48 @@ Mat hogFeature(Mat image){
   hp.Orientation= 0; //atoi(argv[7]);
 
   // Using optimized kernels versions for performance set
-  Cal_kernel_v = 1; //atoi(argv[3]);
-  Cell_kernel_v = 2; //atoi(argv[4]);
-  Block_kernel_v = 3; //atoi(argv[5]);
-  Display_Cell_kernel_v = 1; //atoi(argv[6]);
-  display_kernel_v = 1; //atoi(argv[7]);
+  // Cal_kernel_v = 1; //atoi(argv[3]);
+  // Cell_kernel_v = 2; //atoi(argv[4]);
+  // Block_kernel_v = 3; //atoi(argv[5]);
+  // Display_Cell_kernel_v = 1; //atoi(argv[6]);
+  // display_kernel_v = 1; //atoi(argv[7]);
 
   // Display kernels versions used for testing and collecting results
-  // printf("\n\n-----------------------------------------------------------------------------------");
-  // printf("\n\nRunning Cal_kernel_v # = %d", Cal_kernel_v);
-  // printf("\n\nRunning Cell_kernel_v # = %d", Cell_kernel_v);
-  // printf("\n\nRunning Block_kernel_v # = %d", Block_kernel_v);
-  // printf("\n\nRunning Display_Cell_kernel_v # = %d", Display_Cell_kernel_v);
-  // printf("\n\nRunning display_kernel_v # = %d", display_kernel_v);
-  // printf("\n\n-----------------------------------------------------------------------------------");
+  printf("\n-----------------------------------------------------------");
+  printf("\nRunning Cal_kernel_v # = %d", Cal_kernel_v);
+  printf("\nRunning Cell_kernel_v # = %d", Cell_kernel_v);
+  printf("\nRunning Block_kernel_v # = %d", Block_kernel_v);
+  printf("\nRunning Display_Cell_kernel_v # = %d", Display_Cell_kernel_v);
+  printf("\nRunning display_kernel_v # = %d", display_kernel_v);
+  printf("\n-----------------------------------------------------------\n\n");
 
-  // Removed EXIT_FAILURE checks below since they are hard coded in now
-  // if(Cal_kernel_v>1) {
-	// 	printf("\n\nCal_kernel_v = %d is invalid", Cal_kernel_v);
-	// 	exit(EXIT_FAILURE);
-	// }
 
-  //   if(Cell_kernel_v>2) {
-	// 	printf("\n\nCell_kernel_v = %d is invalid", Cell_kernel_v);
-	// 	exit(EXIT_FAILURE);
-	// }
+  if(Cal_kernel_v>2 || Cal_kernel_v<0) {
+		printf("\n\nCal_kernel_v = %d is invalid\n\n", Cal_kernel_v);
+		exit(EXIT_FAILURE);
+	}
 
-  // if(Block_kernel_v>3) {
-	// 	printf("\n\nBlock_kernel_v = %d is invalid", Block_kernel_v);
-	// 	exit(EXIT_FAILURE);
-	// }
+    if(Cell_kernel_v>2 || Cell_kernel_v<0) {
+		printf("\n\nCell_kernel_v = %d is invalid\n\n", Cell_kernel_v);
+		exit(EXIT_FAILURE);
+	}
 
-  // if(Display_Cell_kernel_v>1) {
-	// 	printf("\n\nDisplay_Cell_kernel_v = %d is invalid", Display_Cell_kernel_v);
-	// 	exit(EXIT_FAILURE);
-	// }
+  if(Block_kernel_v>3 || Block_kernel_v<0) {
+		printf("\n\nBlock_kernel_v = %d is invalid\n\n", Block_kernel_v);
+		exit(EXIT_FAILURE);
+	}
 
-  // if(display_kernel_v>2) {
-	// 	printf("\n\ndisplay_kernel_v = %d is invalid", display_kernel_v);
-	// 	exit(EXIT_FAILURE);
-	// }
+  if(Display_Cell_kernel_v>1 || Display_Cell_kernel_v<0) {
+		printf("\n\nDisplay_Cell_kernel_v = %d is invalid\n\n", Display_Cell_kernel_v);
+		exit(EXIT_FAILURE);
+	}
+
+  if(display_kernel_v>2 || display_kernel_v<0) {
+		printf("\n\ndisplay_kernel_v = %d is invalid\n\n", display_kernel_v);
+		exit(EXIT_FAILURE);
+	}
 	
+  // Removed EXIT_FAILURE checks below since they are hard coded in now
 	// if(hp.CellSize<2 | hp.CellSize> 32) {
 	// 	printf("\n\nCellSize = %d is invalid",hp.CellSize);
 	// 	printf("\n Cell Size can be an integer between 2 and 32\n");
@@ -838,32 +916,34 @@ Mat hogFeature(Mat image){
   checkCuda(launch_helper(GPURuntimes));
   
   // Comment printf out for project (still shown for testing)
-	printf("-----------------------------------------------------------------\n");
+	printf("------------------------HOG Feature------------------------\n");
 	printf("Tfr CPU->GPU = %5.2f ms ... \nExecution = %5.2f ms ... \nTfr GPU->CPU = %5.2f ms   \n Total=%5.2f ms\n",
 			GPURuntimes[1], GPURuntimes[2], GPURuntimes[3], GPURuntimes[0]);
-	printf("-----------------------------------------------------------------\n");
+	printf("-----------------------------------------------------------\n");
 
   // Output the HOG features to the SVM classifier 
   Mat hogFeatureOutput = Mat(dp.DisplayImgRow, dp.DisplayImgCol, CV_8UC1, CPU_OutputArray);
 
-  // No need to save output to file in our project (uncomment show for testing to look at image HOG features are correct)
-  // if (!imwrite("output.bmp", hogFeatureOutput)) { //argv[2]
-	// 	fprintf(stderr, "couldn't write output to disk!\n");
-	// 	cudaFreeHost(CPU_OutputArray);
-  //   cudaFreeHost(CPU_InputArray);
-	//   cudaFreeHost(CPU_FeatureArray);
-	// 	exit(EXIT_FAILURE);
-	// }
+  if (!imwrite("output.bmp", hogFeatureOutput)) { //argv[2]
+		fprintf(stderr, "couldn't write output to disk!\n");
+		cudaFreeHost(CPU_OutputArray);
+    cudaFreeHost(CPU_InputArray);
+	  cudaFreeHost(CPU_FeatureArray);
+		exit(EXIT_FAILURE);
+	}
  
-  // No need to save outputs features text files for our project
-  // WriteNumbers("Feature.txt",CPU_FeatureArray,hp.BlockRow,hp.BlockCol,hp.FeatureSize);
-  // WriteNumbers("Display_feature.txt",CPU_Hist,dp.CellRow,dp.CellCol,4);
+  WriteNumbers("Feature.txt",CPU_FeatureArray,hp.BlockRow,hp.BlockCol,hp.FeatureSize);
+  WriteNumbers("Display_feature.txt",CPU_Hist,dp.CellRow,dp.CellCol,4);
+
+  printf("\nHOG Features written to Feature.txt");
+  printf("\nHOG Features written to Display_feature.txt");
+  printf("\nHOG Features written to output.bmp\n\n");
  
   cudaFreeHost(CPU_OutputArray);
   cudaFreeHost(CPU_InputArray);
   cudaFreeHost(CPU_Hist);	
 	cudaFreeHost(CPU_FeatureArray);
-  printf("\n\n...EXECUTION COMPLETED...\n\n");
+  // printf("\nEXECUTION COMPLETED\n\n");
   exit(EXIT_SUCCESS);
 
   return hogFeatureOutput; // return the HOG Feature image output for the SVM
@@ -876,13 +956,8 @@ Mat hogFeature(Mat image){
 //###################################################################################################################################################
 // Remove main below when integrating into other main.cpp to call hogFeature() there to combine projects
 int main(int argc, char *argv[]) {
-  //----------------------------------------------------------------Load Image---------------------------------------------------------------------
-	Mat image;	// see http://docs.opencv.org/modules/core/doc/basic_structures.html#mat
-  const char* imageFile = "../../data/in000238.jpg";
-	image = imread(imageFile, CV_LOAD_IMAGE_GRAYSCALE); //Load Grayscale image argv[1]
-
   // Hog Feature extraction, input the modified image binary then use HOG feature output for SVM
-  hogFeature(image);
+  hogFeature(argv);
 }
 
 cudaError_t launch_helper(float* Runtimes){
@@ -933,6 +1008,8 @@ cudaError_t launch_helper(float* Runtimes){
 
  if(Cal_kernel_v==1){
   Cal_kernel_v1<<<numBlocks, threadsPerBlock,0,stream[0]>>>(GPU_idata,Orientation,Gradient,DisplayOrientation,hp);
+ } else if(Cal_kernel_v==2) {
+  Cal_kernel_v2<<<numBlocks, threadsPerBlock,0,stream[0]>>>(GPU_idata,Orientation,Gradient,DisplayOrientation,hp);
  } else {
   Cal_kernel_v0<<<numBlocks, threadsPerBlock,0,stream[0]>>>(GPU_idata,Orientation,Gradient,DisplayOrientation,hp);
  }

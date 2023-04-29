@@ -1,4 +1,4 @@
-CODE SOURCED FROM https://github.com/cchinmai19/GPU-Parallel-Programming
+THE ORIGINAL KERNEL VERSIONS CODE SOURCED FROM https://github.com/cchinmai19/GPU-Parallel-Programming
 
 To build and run. Make sure you have CUDA and OPEN_CV and CMAKE installed
 
@@ -12,14 +12,43 @@ make
 The binary is located in 
 /HOG-Feature/bin/HOG
 
-Once Make is successful, run the binary 
-../bin/HOG <file name> <0 or 1> //Parameter 0 to not feature files, 1 to output feature files 
+To run move to bin folder:
+cd ../bin
 
-Example:
- ../bin/HOG ../HOG/gs_ua.1.jpg 1
+Run command:
+./HOG <Cal_kernel_v#> <Cell_kernel_v#> <Block_kernel_v#> <Display_Cell_kernel_v#> <display_kernel_v#>
 
-In /HOG/main.cu, function hog_feature_pull(image_data, d1_flag) is what is needed for our project code. It takes in the image data, runs against the SVM, and outputs the 0 or 1 for the classification. 
+For example with all original kernel versions:
+./HOG 0 0 0 0 0
 
-===============================
-train_HOG.cpp
-- Couldn't get around figuring out how to convert the libjob to feature vector that is usable for this HOG program. CV has a train HOG that creates an SVM. Running through that to create a new SVM to compare against. 
+For optimized versions used:
+./HOG 1 2 3 1 1
+
+Valid version numbers that can be used for inputs:
+Cal_kernel_v#: 0, 1, or 2
+Cell_kernel_v#: 0, 1, or 2
+Block_kernel_v#: 0, 1, 2, or 3
+Display_Cell_kernel_v#: 0 or 1
+display_kernel_v#: 0, 1, or 2
+
+The different kernel versions:
+1.	Cal_kernel_v0
+2.	Cal_kernel_v1
+3.	Cal_kernel_v2
+4.	Cell_kernel_v0
+5.	Cell_kernel_v1
+6.	Cell_kernel_v2
+7.	Block_kernel_v0
+8.	Block_kernel_v1
+9.	Block_kernel_v2
+10.	Block_kernel_v3
+11.	Display_Cell_kernel_v0
+12.	Display_Cell_kernel_v1
+13.	display_kernel_v0
+14.	display_kernel_v1
+15.	display_kernel_v2
+
+The HOG features can be found in the bin folder after running:
+HOG Features written to Feature.txt
+HOG Features written to Display_feature.txt
+HOG Features written to output.bmp
