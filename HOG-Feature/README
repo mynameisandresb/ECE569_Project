@@ -1,9 +1,15 @@
-#To build on hpc run
+THE ORIGINAL KERNEL VERSIONS CODE SOURCED FROM https://github.com/cchinmai19/GPU-Parallel-Programming
+
+#To build HOG-Feature on hpc run
 
 ./build.sh
 
-#To run executable do
+#To run HOG original CUDA kernels version run 
 
 ./run.sh
 
-#This will write the files to ../video_converter/out that can be viewed
+#To run HOG optimized CUDA kernels version run 
+
+./run.sh 1
+
+
