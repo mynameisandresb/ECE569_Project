@@ -574,11 +574,6 @@ void test_cuda(){
   t_serial = t_total-t_parallel;
 
   // print timing information
-  //printf("Total Execution time: %f\n", t_total);
-  //printf("Serial Execution part: %f\n", t_serial);
-  //printf("Parallel Execution part: %f\n", t_parallel);
-  printf("%f\n", t_filter);
-  //printf("%f\n", t_background);
-  //printf("Communication time for GPU: %f\n", t_parallel - (t_filter + t_background));
-
+  printf("Parallel Execution part: %f\n", t_filter);
+  printf("BGS Execution part: %f\n", t_background);
 }
