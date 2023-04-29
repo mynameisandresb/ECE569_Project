@@ -134,7 +134,7 @@ int main(int argc, char *argv[])
 {
   int fast = 0;
   if (argc > 1) {
-    fast = stoi(argv[1]);
+    fast = std::stoi(argv[1]);
   }
   test_cuda(fast);
 
