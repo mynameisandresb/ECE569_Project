@@ -562,7 +562,7 @@ void test_cuda(int fast, int show_result){
     cv::imwrite(buff2, frame_color);
 
     if(show_result){
-      cv::imshow("result", temp);
+      cv::imshow("result", frame_color);
       cvWaitKey(1);
     }
 
