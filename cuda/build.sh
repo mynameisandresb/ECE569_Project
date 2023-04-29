@@ -1,5 +1,6 @@
 #! /bin/bash
 
+# Put open in path
 export PATH=/contrib/ece569/group1/.local/include:${PATH}
 export LD_LIBRARY_PATH=/contrib/ece569/group1/.local/lib
 export LIBRARY_PATH=/contrib/ece569/group1/.local/lib

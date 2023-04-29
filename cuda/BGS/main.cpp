@@ -108,7 +108,7 @@ void median_filter_opt(unsigned char* d_frame,
                      unsigned char* d_blurred,
                      size_t numRows, size_t numCols);
 
-void test_cuda(int fast);
+void test_cuda(int fast, int show_result);
 
 /*
 HOG-Feature
@@ -132,11 +132,19 @@ double cpu_timer(void)
 
 int main(int argc, char *argv[]) 
 {
+
+  // Flag for optmized vs non-optmized kernels
   int fast = 0;
   if (argc > 1) {
     fast = std::stoi(argv[1]);
   }
-  test_cuda(fast);
+
+  // Flag for showing result
+  int show_result = 0;
+  if (argc > 2) {
+    show_result = std::stoi(argv[2]);
+  }
+  test_cuda(fast, show_result);
 
   return 0;
 }
@@ -208,8 +216,8 @@ std::vector<BoundingBox> getBoundingBoxes(cv::Mat &matImage, cv::Mat &colorImage
 
   int imageWidth = matImage.size().width;
   int imageHeight = matImage.size().height;
+
   /// Draw polygonal contour + bonding rects
-  // cv::Mat matImage = cv::Mat::zeros( dilate2.size(), CV_8UC3 );
   std::vector<cv::Mat> vec_as; //(contours.size());
   for (int i = 0; i < contours.size(); i++)
   {
@@ -223,21 +231,25 @@ std::vector<BoundingBox> getBoundingBoxes(cv::Mat &matImage, cv::Mat &colorImage
     int x_comp = 80; 
     int y_comp = 72; 
 
+    // Limit for the blob to be not at the edge of the frame
     if (b_wd < imageWidth && b_wd > 60)
     {
-      if (x_pos + x_comp < imageWidth)// && x_pos - x_comp > 0)
+      if (x_pos + x_comp < imageWidth)//
       {
-        if (y_pos + y_comp < imageHeight) //&& y_pos - y_comp > 0)
+        if (y_pos + y_comp < imageHeight)
         {
+
+          // Stores the bounding box in and grabs it
           boundRect[i].width = x_comp;
           boundRect[i].height = y_comp;
           cv::drawContours(colorImage, contours_poly, i, color, 1, 8, std::vector<cv::Vec4i>(), 0, cv::Point());
           cv::rectangle(colorImage, boundRect[i].tl(), boundRect[i].br(), color, 2, 8, 0);
-          //printf("%d %d %d %d %d\n", i, boundRect[i].x, boundRect[i].y, boundRect[i].width, boundRect[i].height);
-          // printf("%d %d\n", matImage.row, matImage.col );
+
+          // Grabs the bounding box and stores it in a cv matrix
           cv::Mat a;
           matImage(boundRect[i]).copyTo(a);
-          //vec_as[i] = a;
+
+          // Stores in a custom struct uses for calling function
           struct BoundingBox bounding_box;
           bounding_box.image = a;
           bounding_box.rect = boundRect[i];
@@ -251,7 +263,7 @@ std::vector<BoundingBox> getBoundingBoxes(cv::Mat &matImage, cv::Mat &colorImage
   return bounding_boxes;
 }
 
-void test_cuda(int fast){
+void test_cuda(int fast, int show_result){
   /*
   * Timing variables
   */
@@ -263,8 +275,9 @@ void test_cuda(int fast){
   /*
   * create window to display results
   */
-  // cv::namedWindow("origin", CV_WINDOW_AUTOSIZE);
-  // cv::namedWindow("result", CV_WINDOW_AUTOSIZE);
+  if(show_result){
+    cv::namedWindow("result", CV_WINDOW_AUTOSIZE);
+  }
 
   /*
   * Absolute background
@@ -410,6 +423,7 @@ void test_cuda(int fast){
         preprocessGaussianBlur(&frame, &d_frame_to_blur, &d_frame_blurred, &d_blurred_temp, BLUR_SIZE);
         timer.Start();
 
+        // Does optimized gaussian and median blue if fast mode enabled
         if(fast){
           gaussian_and_median_blur_opt(d_frame_to_blur,
                           d_frame_blurred,
@@ -463,7 +477,7 @@ void test_cuda(int fast){
     */
     timer.Start();
 
-
+    // Does optimized background subtraction kernel if fast mode enabled
     if(fast){
       gaussian_background_opt(d_frame,d_amean,d_cmean,d_avar,d_cvar, d_bin, d_aage, d_cage, numRows(), numCols());
     }else{
@@ -496,10 +510,10 @@ void test_cuda(int fast){
   
     // Show the window video of the modified images
     cv::Mat temp = cv::Mat(numRows(), numCols(), CV_8UC1, binary);
-    //cv::imshow("origin", temp);
-    //cv::Mat test = cv::Mat::zeros(1, 72 * 36, CV_32F);
     std::vector<struct BoundingBox> bounding_boxes = getBoundingBoxes(temp, frame_color);
     std::vector<cv::Mat> hogFeatureOutputs(bounding_boxes.size());
+
+    // Loops through the bounding boxes that were found
     for(int w = 0; w < bounding_boxes.size(); w++){
       int type = 0;
       if(bounding_boxes.size() == 2 && w == 0){
@@ -514,6 +528,8 @@ void test_cuda(int fast){
       sprintf(buff2, "../video_converter/out/out_%d_%06d.yml", type, i);
       std::string filename = buff2;
 
+
+      // Time and call hog code with extracted bounding box
       timer.Start();
       if(fast){
         hogFeatureOutputs[w] = hogFeature(bounding_boxes[w].image, filename, 1);
@@ -523,8 +539,7 @@ void test_cuda(int fast){
       timer.Stop();
       t_hog += (timer.Elapsed()/1000);
 
-      // sprintf(buff2, "../../video_converter/out/out_%d_%06d.jpg", type, i);
-      // cv::imwrite(buff2, bounding_boxes[w].image);
+      // Run prediction code and adding text/bounding box overlay on image
       int prediction_int = 0;
       float prediction = svm->predict(hogFeatureOutputs[w]);
       if(type > 0.5){
@@ -546,14 +561,14 @@ void test_cuda(int fast){
                     CV_RGB(118, 185, 0),
                     2);
       }
-      
-      // sprintf(buff2, "../video_converter/out/out_%d_%06d.jpg", prediction_int, i);
-      // cv::imwrite(buff2, bounding_boxes[w].image);
     }
     sprintf(buff2, "../video_converter/out/out_%06d.jpg", i);
     cv::imwrite(buff2, frame_color);
-    // cv::imshow("result", temp);
-    //cvWaitKey(1);
+
+    if(show_result){
+      cv::imshow("result", frame_color);
+      cvWaitKey(1);
+    }
 
     // free up memory on the device
     cleanup();
@@ -569,8 +584,9 @@ void test_cuda(int fast){
   cudaFree(d_gaussian_filter);
 
   //END LOOP and destroy the window
-  // cvDestroyWindow("origin");
-  // cvDestroyWindow("result");
+  if(show_result){
+    cvDestroyWindow("result");
+  }
   t_total_f = cpu_timer();
   t_total = t_total_f-t_total_s;
   t_serial = t_total-t_parallel;
