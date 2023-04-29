@@ -252,7 +252,7 @@ void test_cuda(){
   /*
   * Timing variables
   */
-    double t_parallel_s, t_background, t_communication_s, t_total_s, t_filter;
+    double t_parallel_s, t_background, t_communication_s, t_total_s, t_filter, t_hog;
     double t_parallel_f, t_communication_f, t_total_f;
     double t_serial, t_parallel, t_communication, t_total;
     t_total_s = cpu_timer();
@@ -520,7 +520,12 @@ void test_cuda(){
       }
       sprintf(buff2, "../../video_converter/out/out_%d_%06d.yml", type, i);
       std::string filename = buff2;
+
+      timer.Start();
       hogFeatureOutputs[w] = hogFeature(bounding_boxes[w].image, filename);
+      timer.Stop();
+      t_hog += (timer.Elapsed()/1000);
+
       // sprintf(buff2, "../../video_converter/out/out_%d_%06d.jpg", type, i);
       // cv::imwrite(buff2, bounding_boxes[w].image);
       int prediction_int = 0;
@@ -574,6 +579,7 @@ void test_cuda(){
   t_serial = t_total-t_parallel;
 
   // print timing information
-  printf("Parallel Execution part: %f\n", t_filter);
+  printf("HOG Execution part: %f\n", t_hog);
+  printf("Filter Execution part: %f\n", t_filter);
   printf("BGS Execution part: %f\n", t_background);
 }
