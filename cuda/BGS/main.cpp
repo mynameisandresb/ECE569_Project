@@ -410,22 +410,6 @@ void test_cuda(int fast){
         preprocessGaussianBlur(&frame, &d_frame_to_blur, &d_frame_blurred, &d_blurred_temp, BLUR_SIZE);
         timer.Start();
 
-        // gaussian_filter_separable_opt(d_frame_to_blur,
-        //                 d_frame_blurred,
-        //                 d_blurred_temp,
-        //                 d_gaussian_filter,
-        //                 BLUR_SIZE,
-        //                 numRows(), numCols());
-        // gaussian_filter_opt(d_frame_to_blur,
-        //                     d_blurred_temp,
-        //                     d_gaussian_filter,
-        //                     BLUR_SIZE,
-        //                     BLUR_SIZE,
-        //                     numRows(), numCols());
-        // median_filter(d_blurred_temp,
-        //                 d_frame_blurred,
-        //                 numRows(), numCols());
-
         if(fast){
           gaussian_and_median_blur_opt(d_frame_to_blur,
                           d_frame_blurred,

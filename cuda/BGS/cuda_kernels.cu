@@ -217,6 +217,7 @@ __global__ void median_filter_kernel_v2(unsigned char* d_frame,
 
 	//Setup pixel values
 	tile[threadIdx.x+1][threadIdx.y+1] = d_frame[row*numCols+col];
+
 	//Check for boundry conditions.
 	if(is_x_left && (col>0))
 		tile[threadIdx.x][threadIdx.y+1] = d_frame[row*numCols+(col-1)];
@@ -237,7 +238,8 @@ __global__ void median_filter_kernel_v2(unsigned char* d_frame,
 			tile[threadIdx.x][threadIdx.y+2] = d_frame[(row+1)*numCols+(col-1)];
 	}
 
-	__syncthreads();   //Wait for all threads to be done.
+  //Wait for all threads to be done.
+	__syncthreads();   
 
 	//Setup the filter.
 	unsigned char filterVector[9] = {tile[threadIdx.x][threadIdx.y], tile[threadIdx.x+1][threadIdx.y], tile[threadIdx.x+2][threadIdx.y],
