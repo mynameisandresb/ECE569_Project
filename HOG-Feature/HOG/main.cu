@@ -136,6 +136,10 @@ __global__ void Cal_kernel_v1(uchar *GPU_i, int *Orientation,float *Gradient, uc
 }
 
 // Cal_kernel Optimized Version 2
+// Some execution time performance gains seen
+// Added usage of shared memory
+// Pixels are loaded into shared memory and syncthreads() performed to confirm completenes on thread block. 
+// And variables are not initialized until fall within boundary branch
 __global__ void Cal_kernel_v2(uchar *GPU_i, int *Orientation,float *Gradient, uchar *DisplayOrientation, HogProp hp){
   __shared__ uchar i_shared[BOX_SIZE+2][BOX_SIZE+2];
   
@@ -310,6 +314,14 @@ __global__ void Cell_kernel_v2(float *histogram, int *Orientation,float *Gradien
   }
 }
 
+// Cell_kernel Optimized Version 4
+// Saw significant improvment on execution time performance compared to original version 0
+// Version 4 uses shared memory and to hold partial histograms
+// Then atomicAdd to accumulate into the histogram in shared memory
+// Then goes through the shared memory histogram to updates the global memory
+// This method allows for a more controlled approach when adding information to the cell Histogram. 
+//  By using Shared Memory instead of directly to global, help with latency issues 
+//  By using the atomic Operations   
 __global__ void Cell_kernel_v4(float *histogram, int *Orientation,float *Gradient, HogProp hp){
   // Calculate row, column, and cell indices for the current thread
 // Calculate row, column, and cell indices for the current thread
