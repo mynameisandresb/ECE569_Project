@@ -136,6 +136,10 @@ __global__ void Cal_kernel_v1(uchar *GPU_i, int *Orientation,float *Gradient, uc
 }
 
 // Cal_kernel Optimized Version 2
+// Some execution time performance gains seen
+// Added usage of shared memory
+// Pixels are loaded into shared memory and syncthreads() performed to confirm completenes on thread block. 
+// And variables are not initialized until fall within boundary branch
 __global__ void Cal_kernel_v2(uchar *GPU_i, int *Orientation,float *Gradient, uchar *DisplayOrientation, HogProp hp){
   __shared__ uchar i_shared[BOX_SIZE+2][BOX_SIZE+2];
   
@@ -307,6 +311,57 @@ __global__ void Cell_kernel_v2(float *histogram, int *Orientation,float *Gradien
 
     // Perform the histogram computation using shared memory arrays
     histogram[cell_idx + shared_Orientation[cell_i][cell_j]] += shared_Gradient[cell_i][cell_j];
+  }
+}
+
+// Cell_kernel Optimized Version 4
+// Saw significant improvment on execution time performance compared to original version 0
+// Version 4 uses shared memory and to hold partial histograms
+// Then atomicAdd to accumulate into the histogram in shared memory
+// Then goes through the shared memory histogram to updates the global memory
+// This method allows for a more controlled approach when adding information to the cell Histogram. 
+//  By using Shared Memory instead of directly to global, help with latency issues 
+//  By using the atomic Operations   
+__global__ void Cell_kernel_v4(float *histogram, int *Orientation,float *Gradient, HogProp hp){
+  // Calculate row, column, and cell indices for the current thread
+// Calculate row, column, and cell indices for the current thread
+  int i = blockIdx.x * blockDim.x + threadIdx.x; // row of image
+  int j = blockIdx.y * blockDim.y + threadIdx.y; // col of image
+  int k = threadIdx.z; // index within the cell
+
+  // Define shared memory to hold partial histogram results
+  __shared__ float partial_hist[9];
+
+  // Initialize shared memory to zero for each block
+  for (int bin = threadIdx.z; bin < hp.NumBins; bin += blockDim.z) {
+    partial_hist[bin] = 0.0f;
+  }
+  __syncthreads();
+
+  // Ensure the current thread is within image and cell boundaries
+  if (i < hp.CellRow && j < hp.CellCol && k < hp.CellSize * hp.CellSize){
+    // Calculate cell_i and cell_j, which represent the local row and column indices within the cell
+    int cell_i = k / hp.CellSize;
+    int cell_j = k % hp.CellSize;
+
+    // Calculate the global row and column indices in the image corresponding to the current thread
+    int img_i = i * hp.CellSize + cell_i;
+    int img_j = j * hp.CellSize + cell_j;
+
+    // Calculate the linear indices for the image and the cell histogram
+    int img_idx = img_i * hp.ImgCol + img_j;
+    int cell_idx = i * hp.CellCol * hp.NumBins + j * hp.NumBins;
+
+    // Accumulate gradient values in shared memory based on their orientation
+    atomicAdd(&partial_hist[Orientation[img_idx]], Gradient[img_idx]);
+    __syncthreads();
+
+    // Update the cell histogram in global memory by reducing the partial histogram results from shared memory
+    if (threadIdx.z == 0) {
+      for (int bin = 0; bin < hp.NumBins; bin++) {
+        histogram[cell_idx + bin] += partial_hist[bin];
+      }
+    }
   }
 }
 
@@ -800,7 +855,7 @@ Mat hogFeature(char *argv[]){
 		exit(EXIT_FAILURE);
 	}
 
-    if(Cell_kernel_v>2 || Cell_kernel_v<0) {
+    if(Cell_kernel_v>4 || Cell_kernel_v<0) {
 		printf("\n\nCell_kernel_v = %d is invalid\n\n", Cell_kernel_v);
 		exit(EXIT_FAILURE);
 	}
@@ -1076,6 +1131,13 @@ cudaError_t launch_helper(float* Runtimes){
   numBlocks.y = (int)ceil(hp.CellCol / (float)threadsPerBlock.y);
 
   Cell_kernel_v2<<<numBlocks, threadsPerBlock, 0, stream[0]>>>(GPU_CellHistogram, Orientation, Gradient, hp);
+ } else if(Cell_kernel_v==4 || Cell_kernel_v==3){
+
+  threadsPerBlock = dim3(BOX_SIZE, BOX_SIZE);
+  numBlocks = dim3((int)ceil(hp.CellRow / (float)threadsPerBlock.x), (int)ceil(hp.CellCol / (float)threadsPerBlock.y));
+
+  //Cell_kernel_v2<<<numBlocks, threadsPerBlock, 0, stream[0]>>>(GPU_CellHistogram, Orientation, Gradient, hp);
+    Cell_kernel_v4<<<numBlocks, threadsPerBlock, 0>>>(GPU_CellHistogram, Orientation, Gradient, hp);
  } else {
   threadsPerBlock = dim3(BOX_SIZE, BOX_SIZE);
   numBlocks = dim3((int)ceil(hp.CellRow / (float)threadsPerBlock.x), (int)ceil(hp.CellCol / (float)threadsPerBlock.y));

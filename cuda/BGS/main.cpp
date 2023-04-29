@@ -216,8 +216,8 @@ std::vector<BoundingBox> getBoundingBoxes(cv::Mat &matImage, cv::Mat &colorImage
 
   int imageWidth = matImage.size().width;
   int imageHeight = matImage.size().height;
+
   /// Draw polygonal contour + bonding rects
-  // cv::Mat matImage = cv::Mat::zeros( dilate2.size(), CV_8UC3 );
   std::vector<cv::Mat> vec_as; //(contours.size());
   for (int i = 0; i < contours.size(); i++)
   {
@@ -231,21 +231,25 @@ std::vector<BoundingBox> getBoundingBoxes(cv::Mat &matImage, cv::Mat &colorImage
     int x_comp = 80; 
     int y_comp = 72; 
 
+    // Limit for the blob to be not at the edge of the frame
     if (b_wd < imageWidth && b_wd > 60)
     {
-      if (x_pos + x_comp < imageWidth)// && x_pos - x_comp > 0)
+      if (x_pos + x_comp < imageWidth)//
       {
-        if (y_pos + y_comp < imageHeight) //&& y_pos - y_comp > 0)
+        if (y_pos + y_comp < imageHeight)
         {
+
+          // Stores the bounding box in and grabs it
           boundRect[i].width = x_comp;
           boundRect[i].height = y_comp;
           cv::drawContours(colorImage, contours_poly, i, color, 1, 8, std::vector<cv::Vec4i>(), 0, cv::Point());
           cv::rectangle(colorImage, boundRect[i].tl(), boundRect[i].br(), color, 2, 8, 0);
-          //printf("%d %d %d %d %d\n", i, boundRect[i].x, boundRect[i].y, boundRect[i].width, boundRect[i].height);
-          // printf("%d %d\n", matImage.row, matImage.col );
+
+          // Grabs the bounding box and stores it in a cv matrix
           cv::Mat a;
           matImage(boundRect[i]).copyTo(a);
-          //vec_as[i] = a;
+
+          // Stores in a custom struct uses for calling function
           struct BoundingBox bounding_box;
           bounding_box.image = a;
           bounding_box.rect = boundRect[i];
