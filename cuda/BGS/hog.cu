@@ -721,20 +721,18 @@ Mat hogFeature(Mat image, std::string filename, int fast){
   float *CPU_FeatureArray;//, *CPU_Hist;
 
   // Setting input parameters adjusted optimized performance set
+  hp.CellSize= 8; //atoi(argv[3]); 
+  hp.BlockSize= 2; //atoi(argv[4]); 
   hp.BlockOverlap= 1; //atoi(argv[5]); 		  
   hp.NumBins= 9; //atoi(argv[6]); 
   hp.Orientation= 0; //atoi(argv[7]);
 
   // Using optimized kernels versions for performance set
   if(fast){
-    hp.CellSize = 8; //atoi(argv[3]);
-    hp.BlockSize= 4; //atoi(argv[4]); 
     Cal_kernel_v = 1; //atoi(argv[3]); 0 or 1 
     Cell_kernel_v = 4; //atoi(argv[4]);
     Block_kernel_v = 3; //atoi(argv[5]);
   }else{
-    hp.CellSize = 4; //atoi(argv[3]); 
-    hp.BlockSize= 2; //atoi(argv[4]); 
     Cal_kernel_v = 0; //atoi(argv[3]); 0 or 1 
     Cell_kernel_v = 0; //atoi(argv[4]);
     Block_kernel_v = 0; //atoi(argv[5]);
