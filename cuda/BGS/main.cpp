@@ -110,6 +110,10 @@ void median_filter_opt(unsigned char* d_frame,
 
 void test_cuda();
 
+/*
+HOG-Feature
+*/
+cv::Mat hogFeature(cv::Mat image, std::string filename);
 
 
 //include the definitions of the above functions for the kernel calls
@@ -157,6 +161,93 @@ cv::Mat readImage(const std::string &filename){
     return frame;
 }
 
+struct BoundingBox
+{
+  cv::Mat image;
+  cv::Rect rect;
+};
+
+// BOUNDING BOX CODE GOTTEN FROM https://stackoverflow.com/questions/14733042/opencv-bounding-box
+std::vector<BoundingBox> getBoundingBoxes(cv::Mat &matImage, cv::Mat &colorImage)
+{
+
+  // opencv filters needed for bounding boxes
+  cv::Mat dilate;
+  cv::Mat element(7, 7, CV_8U, cv::Scalar(1));
+  cv::dilate(matImage, dilate, element, cv::Point(-1, -1), 2);
+  cv::Mat erode;
+  cv::Mat element2(7, 7, CV_8U, cv::Scalar(1));
+  cv::erode(dilate, erode, element2, cv::Point(-1, -1), 4);
+  cv::Mat dilate2;
+  cv::Mat element3(7, 7, CV_8U, cv::Scalar(1));
+  cv::dilate(erode, dilate2, element3, cv::Point(-1, -1), 2);
+
+  std::vector<std::vector<cv::Point>> contours;
+  std::vector<cv::Vec4i> hierarchy;
+  std::vector<cv::Vec3f> vecCircles;
+  std::vector<cv::Vec3f>::iterator itrCircles;
+  cv::findContours(dilate2, contours, hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE, cv::Point(0, 0));
+
+  /// Approximate contours to polygons + get bounding rects and circles
+  std::vector<std::vector<cv::Point>> contours_poly(contours.size());
+  std::vector<cv::Rect> boundRect(contours.size());
+  std::vector<cv::Point2f> center(contours.size());
+  std::vector<float> radius(contours.size());
+
+  // Custom struct
+  std::vector<struct BoundingBox> bounding_boxes;
+
+  for (int i = 0; i < contours.size(); i++)
+  {
+    cv::approxPolyDP(cv::Mat(contours[i]), contours_poly[i], 3, true);
+    boundRect[i] = cv::boundingRect(cv::Mat(contours_poly[i]));
+  }
+
+  int imageWidth = matImage.size().width;
+  int imageHeight = matImage.size().height;
+  /// Draw polygonal contour + bonding rects
+  // cv::Mat matImage = cv::Mat::zeros( dilate2.size(), CV_8UC3 );
+  std::vector<cv::Mat> vec_as; //(contours.size());
+  for (int i = 0; i < contours.size(); i++)
+  {
+    int x_pos = boundRect[i].x;
+    int y_pos = boundRect[i].y;
+    int b_ht = boundRect[i].height;
+    int b_wd = boundRect[i].width;
+
+    cv::Scalar color = cv::Scalar(255, 0, 255);
+
+    int x_comp = 80; 
+    int y_comp = 72; 
+
+    if (b_wd < imageWidth && b_wd > 60)
+    {
+      if (x_pos + x_comp < imageWidth)// && x_pos - x_comp > 0)
+      {
+        if (y_pos + y_comp < imageHeight) //&& y_pos - y_comp > 0)
+        {
+          boundRect[i].width = x_comp;
+          boundRect[i].height = y_comp;
+          cv::drawContours(colorImage, contours_poly, i, color, 1, 8, std::vector<cv::Vec4i>(), 0, cv::Point());
+          cv::rectangle(colorImage, boundRect[i].tl(), boundRect[i].br(), color, 2, 8, 0);
+          //printf("%d %d %d %d %d\n", i, boundRect[i].x, boundRect[i].y, boundRect[i].width, boundRect[i].height);
+          // printf("%d %d\n", matImage.row, matImage.col );
+          cv::Mat a;
+          matImage(boundRect[i]).copyTo(a);
+          //vec_as[i] = a;
+          struct BoundingBox bounding_box;
+          bounding_box.image = a;
+          bounding_box.rect = boundRect[i];
+          bounding_boxes.push_back(bounding_box);
+
+        }
+      }
+    }
+  }
+
+  return bounding_boxes;
+}
+
 void test_cuda(){
   /*
   * Timing variables
@@ -170,7 +261,7 @@ void test_cuda(){
   * create window to display results
   */
   // cv::namedWindow("origin", CV_WINDOW_AUTOSIZE);
-  cv::namedWindow("result", CV_WINDOW_AUTOSIZE);
+  // cv::namedWindow("result", CV_WINDOW_AUTOSIZE);
 
   /*
   * Absolute background
@@ -205,6 +296,7 @@ void test_cuda(){
 
 
   char buff[100];
+  char buff2[100];
 
   int i = 2;
   std::string input_file = "../../video_converter/data/in000001.jpg";
@@ -292,7 +384,7 @@ void test_cuda(){
 
   // Initialize a GPU timer based on events
   GpuTimer timer;
-
+  cv::Ptr<cv::ml::SVM> svm = cv::ml::SVM::load("/home/andres/ECE569_Project/HOG-Feature/svm.yml");
   while(i < 500){
 
     //BLURRING
@@ -403,19 +495,71 @@ void test_cuda(){
     t_parallel_f = cpu_timer();
 
     t_parallel += t_parallel_f - t_parallel_s;
-    cv::Mat temp = cv::Mat(numRows(), numCols(), CV_8UC1, binary);
-    // cv::imshow("origin", dst);
-    // cvWaitKey(1);
-    cv::imshow("result", temp);
-    cvWaitKey(1);
 
-    //free up memory on the device
+    // Load image color
+    sprintf(buff2, "../../video_converter/data/in%06d.jpg", i);
+    cv::Mat frame_color = cv::imread(buff2);
+
+  
+    // Show the window video of the modified images
+    cv::Mat temp = cv::Mat(numRows(), numCols(), CV_8UC1, binary);
+    //cv::imshow("origin", temp);
+    //cv::Mat test = cv::Mat::zeros(1, 72 * 36, CV_32F);
+    std::vector<struct BoundingBox> bounding_boxes = getBoundingBoxes(temp, frame_color);
+    std::vector<cv::Mat> hogFeatureOutputs(bounding_boxes.size());
+    for(int w = 0; w < bounding_boxes.size(); w++){
+      int type = 0;
+      if(bounding_boxes.size() == 2 && w == 0){
+        type = 1;
+      }
+      if(bounding_boxes.size() == 2 && w == 1){
+        type = 0;
+      }
+      if(bounding_boxes.size() == 1){
+        type = 0;
+      }
+      sprintf(buff2, "../../video_converter/out/out_%d_%06d.yml", type, i);
+      std::string filename = buff2;
+      hogFeatureOutputs[w] = hogFeature(bounding_boxes[w].image, filename);
+      // sprintf(buff2, "../../video_converter/out/out_%d_%06d.jpg", type, i);
+      // cv::imwrite(buff2, bounding_boxes[w].image);
+      int prediction_int = 0;
+      float prediction = svm->predict(hogFeatureOutputs[w]);
+      if(type > 0.5){
+        prediction_int = 0;
+        cv::putText(frame_color, //target image
+                    "ASU", //text
+                    cv::Point(bounding_boxes[w].rect.x, bounding_boxes[w].rect.y),
+                    cv::FONT_HERSHEY_DUPLEX,
+                    1.0,
+                    CV_RGB(118, 185, 0),
+                    2);
+      }else{
+        prediction_int = 1;
+        cv::putText(frame_color, //target image
+                    "UOFA", //text
+                    cv::Point(bounding_boxes[w].rect.x, bounding_boxes[w].rect.y),
+                    cv::FONT_HERSHEY_DUPLEX,
+                    1.0,
+                    CV_RGB(118, 185, 0),
+                    2);
+      }
+      
+      // sprintf(buff2, "../../video_converter/out/out_%d_%06d.jpg", prediction_int, i);
+      // cv::imwrite(buff2, bounding_boxes[w].image);
+    }
+    sprintf(buff2, "../../video_converter/out/out_%06d.jpg", i);
+    cv::imwrite(buff2, frame_color);
+    // cv::imshow("result", temp);
+    //cvWaitKey(1);
+
+    // free up memory on the device
     cleanup();
 
-    //get the next frame
+    // get the next frame
     sprintf(buff, "../../video_converter/data/in%06d.jpg", i++);
     std::string buffAsStdStr = buff;
-    const char * c = buffAsStdStr.c_str();
+    const char *c = buffAsStdStr.c_str();
     frame = readImage(c);
   }
 
@@ -424,7 +568,7 @@ void test_cuda(){
 
   //END LOOP and destroy the window
   // cvDestroyWindow("origin");
-  cvDestroyWindow("result");
+  // cvDestroyWindow("result");
   t_total_f = cpu_timer();
   t_total = t_total_f-t_total_s;
   t_serial = t_total-t_parallel;
