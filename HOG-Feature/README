@@ -1,14 +1,14 @@
-THE ORIGINAL KERNEL VERSIONS CODE SOURCED FROM https://github.com/cchinmai19/GPU-Parallel-Programming
+# THE ORIGINAL KERNEL VERSIONS CODE SOURCED FROM https://github.com/cchinmai19/GPU-Parallel-Programming
 
-#To build HOG-Feature on hpc run
+# To build HOG-Feature on hpc run
 
 ./build.sh
 
-#To run HOG original CUDA kernels version run 
+# To run HOG original CUDA kernels version run 
 
 ./run.sh
 
-#To run HOG optimized CUDA kernels version run 
+# To run HOG optimized CUDA kernels version run 
 
 ./run.sh 1
 

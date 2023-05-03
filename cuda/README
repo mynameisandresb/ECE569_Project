@@ -1,13 +1,15 @@
-#To build on hpc run
+# THE ORIGINAL KERNEL VERSIONS CODE SOURCED FROM https://github.com/cchinmai19/GPU-Parallel-Programming
+
+# To build on hpc run
 
 ./build.sh
 
-#To run executable for original CUDA kernels do
+# To run executable for original CUDA kernels do
 
 ./run.sh
 
-#To run executable for optimized FAST CUDA kernels do
+# To run executable for optimized FAST CUDA kernels do
 
 ./run.sh 1
 
-#This will write the files to ../video_converter/out that can be viewed
+# This will write the files to ../video_converter/out that can be viewed
