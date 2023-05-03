@@ -25,6 +25,7 @@ README.md for running respective code bases is located in ./cuda and ./HOG-Featu
 Make sure terminal is in either the cuda directory or the HOG-Feature directory to properly execute their README
 
 Below code is if you want to run optimized versions only, follow these steps exactly
+
 Follow README in each directory however for more detailed instructions
 ```
 # Execute cuda kernels
