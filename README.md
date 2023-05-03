@@ -21,3 +21,5 @@ If you use their implementation please cite:
 
 
 README.md for running code is located in ./cuda and ./HOG-Feature
+
+Make sure terminal is in either the cuda directory or the HOG-Feature directory to properly execute their README
