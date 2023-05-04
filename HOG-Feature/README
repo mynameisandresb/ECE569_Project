@@ -11,5 +11,3 @@
 # To run HOG optimized CUDA kernels version run 
 
 ./run.sh 1
-
-
