@@ -40,3 +40,81 @@ cd HOG-Feature
 ./build.sh
 ./run.sh 1
 ```
+
+
+# Install instructions if running outside hpc node
+
+
+# Download and unpack sources
+```
+wget -O opencv.zip https://github.com/opencv/opencv/archive/refs/tags/3.3.0.zip
+
+unzip opencv.zip
+```
+
+# Create build directory
+```
+mkdir -p build && cd build
+```
+
+# Configure
+```
+cmake  ../opencv-3.3.0
+```
+
+# Build
+```
+cmake --build .
+
+cmake -DCMAKE_INSTALL_PREFIX=$HOME/.local .
+
+make install -j64
+```
+
+# Add exports to bashrc
+```
+vim $HOME/.bashrc
+```
+```
+export PATH=$HOME/.local/include:${PATH}
+export LD_LIBRARY_PATH=$HOME/.local/lib
+export LIBRARY_PATH=$HOME/.local/lib
+export CPLUS_INCLUDE_PATH=$HOME/.local/include
+export PKG_CONFIG_PATH=$HOME/.local/lib/pkgconfig
+```
+
+# Source bashrc
+```
+source $HOME/.bashrc
+```
+
+# Download source code
+[https://github.com/zpiernater/ECE569_Project](https://github.com/zpiernater/ECE569_Project.git)
+
+# Change directory to relevant cloned code
+```
+cd ECE569_Project
+cd serial_and_tbb
+```
+
+# get dataset
+http://jacarini.dinf.usherbrooke.ca/static/dataset/dataset2014.zip
+
+# change dir path on line 12 main.cpp to your data
+```
+...CODE SNIPPET FROM serial_and_tbb/main.cpp...
+
+// Specify path to image set 
+// (ex: badminton, boulevard, sofa, traffic)
+const char* PATH = "../Videos/sofa/input/";
+```
+
+# Make inside serial_and_tbb
+```
+make
+```
+
+# run code
+```
+./main 1 0 0
+```
